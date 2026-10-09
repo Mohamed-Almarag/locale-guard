@@ -1,0 +1,33 @@
+# Git hooks. Installed automatically by `npm install` (see the `prepare` script).
+# Keep pre-commit fast: it runs on every commit.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: format
+      glob: '*.{ts,mjs,js,json,yml,yaml,md}'
+      exclude:
+        - 'dist/**'
+        - 'tests/fixtures/**'
+      run: npx prettier --write {staged_files}
+      stage_fixed: true
+
+    - name: lint
+      glob: '*.{ts,mjs}'
+      exclude:
+        - 'dist/**'
+        - 'tests/fixtures/**'
+      run: npx eslint {staged_files}
+
+    - name: typecheck
+      run: npm run typecheck
+
+    - name: test
+      run: npm test
+
+# Rebuilds dist/ and blocks the push if the committed bundle is out of date,
+# because GitHub runs dist/index.js exactly as it is in the repo.
+pre-push:
+  jobs:
+    - name: check-dist
+      run: npm run check:dist

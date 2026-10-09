@@ -1,0 +1,14 @@
+{
+  "Checkout": {
+    "total": "Total: {amount, number, ::currency/USD}"
+  },
+  "Cart": {
+    "items": "{count, plural, one {عنصر واحد} other {# عناصر}}"
+  },
+  "Terms": {
+    "agree": "أوافق على شروط الخدمة"
+  },
+  "Profile": {
+    "welcome": "{gendr, select, female {أهلًا بعودتكِ} male {أهلًا بعودتك} other {أهلًا بعودتك}}"
+  }
+}
