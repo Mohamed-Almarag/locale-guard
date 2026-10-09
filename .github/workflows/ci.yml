@@ -57,6 +57,13 @@ jobs:
         id: checkout
         uses: actions/checkout@v7
 
+      # Runs the bundled action on the fixtures. They contain intentional issues,
+      # so it only reports.
       - name: Test Local Action
         id: test-action
         uses: ./
+        with:
+          files: tests/fixtures/vue-project/locales/{locale}.json
+          format: vue-i18n
+          fail-on: never
+          comment: false
