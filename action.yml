@@ -1,0 +1,13 @@
+name: Locale Guard
+description:
+  Check translation files on every pull request for missing keys, broken
+  placeholders and untranslated text.
+author: Mohamed Almarag
+
+branding:
+  icon: globe
+  color: blue
+
+runs:
+  using: node24
+  main: dist/index.js

@@ -1,0 +1,65 @@
+{
+  "name": "locale-guard",
+  "description": "GitHub Action that checks translation files on every pull request",
+  "version": "0.0.0",
+  "author": "Mohamed Almarag",
+  "type": "module",
+  "private": true,
+  "homepage": "https://github.com/Mohamed-Almarag/locale-guard",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mohamed-Almarag/locale-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Mohamed-Almarag/locale-guard/issues"
+  },
+  "keywords": [
+    "actions",
+    "i18n",
+    "vue-i18n",
+    "next-intl",
+    "translations"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "prepare": "lefthook install",
+    "bundle": "npm run format:write && npm run package",
+    "format:write": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "local-action": "local-action . src/main.ts .env",
+    "package": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",
+    "all": "npm run format:write && npm run lint && npm run typecheck && npm run test && npm run package"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^3.0.0"
+  },
+  "devDependencies": {
+    "@eslint/compat": "^2.0.2",
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^10.0.1",
+    "@github/local-action": "^7.0.1",
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/node": "^24.19.2",
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "lefthook": "^2.2.1",
+    "prettier": "^3.8.1",
+    "rollup": "^4.57.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "*"
+  }
+}
