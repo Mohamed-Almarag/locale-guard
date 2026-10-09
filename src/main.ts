@@ -6,7 +6,7 @@ import { loadProject, localFileSource } from './core/loaders/index.js'
 import { decide } from './core/policy.js'
 import type { Issue } from './core/types.js'
 import { annotate } from './github/annotations.js'
-import { upsertComment } from './github/comment.js'
+import { findComment, upsertComment } from './github/comment.js'
 import {
   type Octokit,
   type RunContext,
@@ -126,7 +126,12 @@ async function skipPullRequest(
   if (!pr) return false
   try {
     const changed = await listChangedFiles(octokit, context.repo, pr.number)
-    return !touchesLocales(changed, config.files)
+    if (touchesLocales(changed, config.files)) return false
+    // A previous run left a comment, e.g. before a fix reverted the locale
+    // changes. Run again so the comment does not show stale issues.
+    return !(
+      config.comment && (await findComment(octokit, context.repo, pr.number))
+    )
   } catch (error) {
     core.warning(
       `Could not list the files of this pull request, so every locale file is checked. ${error instanceof Error ? error.message : ''}`
@@ -174,7 +179,9 @@ async function comment(
 
 function logIssues(issues: Issue[]): void {
   if (issues.length === 0) return
-  core.startGroup(`Locale Guard: ${issues.length} issues`)
+  core.startGroup(
+    `Locale Guard: ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`
+  )
   for (const issue of issues) {
     core.info(
       `${issue.severity} ${issue.locale} ${issue.file}${issue.line ? `:${issue.line}` : ''} ${issue.message.replace(/`/g, '')}`

@@ -21,12 +21,7 @@ export async function upsertComment(
   options: { createIfMissing: boolean }
 ): Promise<CommentResult> {
   try {
-    const comments = await octokit.paginate(octokit.rest.issues.listComments, {
-      ...repo,
-      issue_number: issueNumber,
-      per_page: 100
-    })
-    const existing = comments.find((comment) => comment.body?.includes(MARKER))
+    const existing = await findComment(octokit, repo, issueNumber)
 
     if (existing) {
       if (existing.body === body) {
@@ -59,4 +54,18 @@ export async function upsertComment(
     }
     throw error
   }
+}
+
+/** The Locale Guard comment on a pull request, found by its hidden marker. */
+export async function findComment(
+  octokit: Octokit,
+  repo: RepoRef,
+  issueNumber: number
+) {
+  const comments = await octokit.paginate(octokit.rest.issues.listComments, {
+    ...repo,
+    issue_number: issueNumber,
+    per_page: 100
+  })
+  return comments.find((comment) => comment.body?.includes(MARKER))
 }

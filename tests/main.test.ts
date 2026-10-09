@@ -136,9 +136,27 @@ describe('run', () => {
     expect(core.info).toHaveBeenCalledWith(
       'No locale files changed in this pull request. Nothing to check.'
     )
-    expect(rest.issues.listComments).not.toHaveBeenCalled()
+    expect(rest.issues.createComment).not.toHaveBeenCalled()
     expect(state.comments).toHaveLength(0)
     expect(core.setFailed).not.toHaveBeenCalled()
+  })
+
+  it('still runs when an earlier comment exists, so it does not stay stale', async () => {
+    const { state } = setup({
+      state: {
+        files: [{ filename: 'src/a.ts' }],
+        comments: [
+          { id: 1, body: '<!-- locale-guard -->\nold', html_url: 'u1' }
+        ]
+      }
+    })
+
+    await run()
+
+    expect(core.info).not.toHaveBeenCalledWith(
+      'No locale files changed in this pull request. Nothing to check.'
+    )
+    expect(state.comments[0]?.body).toContain('### ❌ ar: 1 missing key')
   })
 
   it('does not try to comment on a fork, and still reports', async () => {
