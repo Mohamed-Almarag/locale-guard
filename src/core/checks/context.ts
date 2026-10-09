@@ -1,3 +1,4 @@
+import { type MessageInfo, createDescriber } from '../formats/index.js'
 import type { Format, Issue, Locale, Position, Project } from '../types.js'
 
 export interface CheckContext {
@@ -6,6 +7,8 @@ export interface CheckContext {
   base: Locale
   /** Every locale except the base one. */
   targets: Locale[]
+  /** Parses a message in the project's format. Results are cached. */
+  describe: (source: string) => MessageInfo
 }
 
 export type Check = (context: CheckContext) => Issue[]
@@ -19,7 +22,7 @@ export function createContext(
   const targets = [...project.locales.values()].filter(
     (locale) => locale.code !== base.code
   )
-  return { project, format, base, targets }
+  return { project, format, base, targets, describe: createDescriber(format) }
 }
 
 /** The namespace a key belongs to in a locale: the longest file namespace that prefixes it. */
