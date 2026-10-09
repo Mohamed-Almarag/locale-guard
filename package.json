@@ -34,7 +34,8 @@
     "test:watch": "vitest",
     "local-action": "local-action . src/main.ts .env",
     "package": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",
-    "all": "npm run format:write && npm run lint && npm run typecheck && npm run test && npm run package"
+    "all": "npm run format:write && npm run lint && npm run typecheck && npm run test && npm run package",
+    "check:dist": "npm run package && git diff --exit-code --stat HEAD -- dist"
   },
   "license": "MIT",
   "dependencies": {

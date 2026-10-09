@@ -30,6 +30,4 @@ pre-commit:
 pre-push:
   jobs:
     - name: check-dist
-      run:
-        npm run package && git diff --quiet HEAD -- dist || (echo "dist/ is out
-        of date. Run 'npm run package' and commit dist/." && exit 1)
+      run: npm run check:dist
