@@ -46,6 +46,43 @@ describe('vue-project fixture', () => {
   })
 })
 
+const MESSAGE_CHECKS: CheckId[] = [
+  'invalid-syntax',
+  'placeholder-mismatch',
+  'broken-linked-messages'
+]
+
+describe('vue-project fixture: placeholders', () => {
+  it('finds placeholder and linked message issues', async () => {
+    const issues = await analyzeFixture(
+      'vue-project',
+      'locales/{locale}.json',
+      'vue-i18n',
+      MESSAGE_CHECKS
+    )
+    expect(summarize(issues)).toEqual([
+      'ar auction.saveBid:11 `auction.saveBid` links to `@:common.sav`, which does not exist in ar',
+      'ar inbox.greeting:18 `inbox.greeting`: missing `{name}`',
+      'fr auction.bid.placed:9 `auction.bid.placed`: missing `{amount}`, unexpected `{amout}`'
+    ])
+  })
+})
+
+describe('next-project fixture: placeholders', () => {
+  it('finds argument and tag issues', async () => {
+    const issues = await analyzeFixture(
+      'next-project',
+      'messages/{locale}.json',
+      'next-intl',
+      MESSAGE_CHECKS
+    )
+    expect(summarize(issues)).toEqual([
+      'ar Terms.agree:9 `Terms.agree`: missing `<link>`',
+      'ar Profile.welcome:12 `Profile.welcome`: missing `{gender}`, unexpected `{gendr}`'
+    ])
+  })
+})
+
 describe('next-project fixture', () => {
   it('finds the key issues with their lines', async () => {
     const issues = await analyzeFixture(
