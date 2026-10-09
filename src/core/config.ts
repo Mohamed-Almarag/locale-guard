@@ -26,6 +26,7 @@ export const configSchema = z.object({
       }
     }),
   'fail-on': z.enum(['error', 'warning', 'never']).default('error'),
+  'fail-on-existing': flag.default(false),
   comment: flag.default(true),
   annotations: flag.default(true)
 })

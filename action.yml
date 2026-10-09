@@ -27,6 +27,10 @@ inputs:
     description:
       'When the check fails: error, warning or never. Default: error.'
     required: false
+  fail-on-existing:
+    description:
+      'Also fail on issues that existed before the pull request. Default: false.'
+    required: false
   comment:
     description:
       'Write a single pull request comment that is updated on every run.

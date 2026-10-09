@@ -68955,6 +68955,26 @@ function rank(issue) {
     return issue.severity === 'error' ? 0 : 1;
 }
 
+/**
+ * Identifies "the same issue" on two branches. The file path and line are left
+ * out on purpose: moving a key or adding lines above it must not turn an old
+ * issue into a new one.
+ */
+function fingerprint(issue) {
+    return [issue.check, issue.locale, issue.key, issue.message].join('\u0000');
+}
+/**
+ * F9: marks each issue of the pull request as new, or as existing when the
+ * same issue is already on the base branch.
+ */
+function markNew(head, base) {
+    const existing = new Set(base.map(fingerprint));
+    return head.map((issue) => ({
+        ...issue,
+        isNew: !existing.has(fingerprint(issue))
+    }));
+}
+
 function getEnumValues(entries) {
     const numericValues = Object.values(entries).filter((v) => typeof v === "number");
     const values = Object.entries(entries)
@@ -74826,6 +74846,7 @@ const configSchema = object({
         }
     }),
     'fail-on': _enum(['error', 'warning', 'never']).default('error'),
+    'fail-on-existing': flag.default(false),
     comment: flag.default(true),
     annotations: flag.default(true)
 });
@@ -86239,6 +86260,16 @@ function localFileSource(root) {
         read: (path) => readFile(join(root, path), 'utf8')
     };
 }
+/** A source built from a known list of paths, e.g. a git tree or an in-memory map in tests. */
+function listFileSource(paths, read) {
+    return {
+        glob: async (patterns) => {
+            const isMatch = picomatch(patterns);
+            return paths.filter((path) => isMatch(path) && !path.includes('node_modules/'));
+        },
+        read
+    };
+}
 async function loadProject(source, options) {
     const ignored = new Set(options.ignoreLocales ?? []);
     const found = new Map();
@@ -86607,6 +86638,90 @@ function lineLinker(run, sha) {
     return (file, line) => `${root}/${file.split('/').map(encodeURIComponent).join('/')}${line ? `#L${line}` : ''}`;
 }
 
+/** Parallel blob downloads, kept low to stay clear of GitHub's secondary rate limits. */
+const CONCURRENCY = 8;
+/**
+ * F9: reads the locale files of the base branch through the API, so users do
+ * not need `fetch-depth: 0` in actions/checkout.
+ *
+ * Only the folders the patterns can match are listed (e.g. `locales/` for
+ * `locales/{locale}.json`), which keeps large repositories fast and avoids the
+ * size limit of a recursive tree of the whole repo.
+ */
+async function baseFileSource(octokit, repo, sha, patterns) {
+    const blobs = new Map();
+    for (const dir of rootDirs(patterns)) {
+        const treeSha = await resolveTree(octokit, repo, sha, dir);
+        if (!treeSha)
+            continue;
+        const { data } = await octokit.rest.git.getTree({
+            ...repo,
+            tree_sha: treeSha,
+            recursive: 'true'
+        });
+        if (data.truncated) {
+            throw new Error(`The base branch has too many files under "${dir || '/'}" to list them through the API.`);
+        }
+        for (const entry of data.tree) {
+            if (entry.type === 'blob' && entry.path && entry.sha) {
+                blobs.set(dir ? `${dir}/${entry.path}` : entry.path, entry.sha);
+            }
+        }
+    }
+    const limit = limiter(CONCURRENCY);
+    return listFileSource([...blobs.keys()], (path) => limit(async () => {
+        const { data } = await octokit.rest.git.getBlob({
+            ...repo,
+            file_sha: blobs.get(path)
+        });
+        return Buffer.from(data.content, data.encoding === 'base64' ? 'base64' : 'utf8').toString('utf8');
+    }));
+}
+/** The fixed folders at the start of each pattern, without folders nested in another one. */
+function rootDirs(patterns) {
+    const dirs = patterns.map((pattern) => {
+        const segments = toGlob(pattern).split('/');
+        const fixed = [];
+        for (const segment of segments.slice(0, -1)) {
+            if (/[*?[{]/.test(segment))
+                break;
+            fixed.push(segment);
+        }
+        return fixed.join('/');
+    });
+    const unique = [...new Set(dirs)].sort();
+    return unique.filter((dir) => !unique.some((other) => other !== dir && (other === '' || dir.startsWith(`${other}/`))));
+}
+async function resolveTree(octokit, repo, sha, dir) {
+    let treeSha = sha;
+    for (const segment of dir ? dir.split('/') : []) {
+        const { data } = await octokit.rest.git.getTree({
+            ...repo,
+            tree_sha: treeSha
+        });
+        const entry = data.tree.find((item) => item.path === segment && item.type === 'tree');
+        if (!entry?.sha)
+            return undefined;
+        treeSha = entry.sha;
+    }
+    return treeSha;
+}
+function limiter(max) {
+    let active = 0;
+    const queue = [];
+    return async (task) => {
+        if (active >= max)
+            await new Promise((resolve) => queue.push(resolve));
+        active++;
+        try {
+            return await task();
+        }
+        finally {
+            active--;
+            queue.shift()?.();
+        }
+    };
+}
 /** Every file the pull request touches, including the old name of renamed files. */
 async function listChangedFiles(octokit, repo, pullNumber) {
     const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
@@ -86638,6 +86753,7 @@ const INPUTS = [
     'base-locale',
     'files',
     'fail-on',
+    'fail-on-existing',
     'comment',
     'annotations'
 ];
@@ -86678,13 +86794,18 @@ async function check(config) {
             : `No locale files match ${config.files.map((p) => `"${p}"`).join(', ')}. Check "files".`);
         return;
     }
-    const issues = analyze(project, { format: config.format });
+    const headIssues = analyze(project, { format: config.format });
+    const baseIssues = pr && octokit ? await analyzeBase(octokit, context, config) : undefined;
+    const issues = baseIssues ? markNew(headIssues, baseIssues) : headIssues;
+    const hasBaseline = baseIssues !== undefined;
     logIssues(issues);
     const link = lineLinker(context, pr?.headSha ?? context.sha);
-    const report = { issues, project, hasBaseline: false, link };
+    const report = { issues, project, hasBaseline, link };
     await writeSummary(renderReport({ ...report, maxLength: SUMMARY_LIMIT }));
-    if (config.annotations)
-        annotate(issues, baseLocale);
+    if (config.annotations) {
+        // With a baseline, old issues are not annotated: they are not this PR's doing.
+        annotate(hasBaseline ? issues.filter((issue) => issue.isNew) : issues, baseLocale);
+    }
     if (config.comment && pr && octokit) {
         await comment(octokit, context, renderReport({
             ...report,
@@ -86695,15 +86816,37 @@ async function check(config) {
     // F13
     const verdict = decide(issues, {
         failOn: config['fail-on'],
-        failOnExisting: true
+        failOnExisting: config['fail-on-existing']
     });
+    const existing = issues.filter((issue) => !issue.isNew).length;
     if (verdict.failed) {
         setFailed(`Locale Guard found ${verdict.blocking.length} translation ${verdict.blocking.length === 1 ? 'issue' : 'issues'} (fail-on: ${config['fail-on']}).`);
     }
     else {
         info(issues.length
-            ? `Locale Guard found ${issues.length} issues, none blocking (fail-on: ${config['fail-on']}).`
+            ? `Locale Guard found ${issues.length} issues, none blocking (fail-on: ${config['fail-on']}${existing ? `, ${existing} already existed before this pull request` : ''}).`
             : 'All translations are in sync.');
+    }
+}
+/**
+ * F9: runs the same checks on the base branch. Returns undefined when the base
+ * cannot be read, so every issue is treated as new instead of failing the run.
+ */
+async function analyzeBase(octokit, context, config) {
+    const pr = context.pullRequest;
+    if (!pr)
+        return undefined;
+    try {
+        const source = await baseFileSource(octokit, context.repo, pr.baseSha, config.files);
+        const project = await loadProject(source, {
+            patterns: config.files,
+            baseLocale: config['base-locale']
+        });
+        return analyze(project, { format: config.format });
+    }
+    catch (error) {
+        warning(`Could not read the locale files of the base branch, so every issue is treated as new. ${error instanceof Error ? error.message : ''}`);
+        return undefined;
     }
 }
 async function skipPullRequest(octokit, context, config) {

@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { analyze } from './core/analyze.js'
+import { markNew } from './core/baseline.js'
 import { type Config, parseConfig } from './core/config.js'
 import { loadProject, localFileSource } from './core/loaders/index.js'
 import { decide } from './core/policy.js'
@@ -13,7 +14,11 @@ import {
   lineLinker,
   readRunContext
 } from './github/context.js'
-import { listChangedFiles, touchesLocales } from './github/files.js'
+import {
+  baseFileSource,
+  listChangedFiles,
+  touchesLocales
+} from './github/files.js'
 import { renderReport } from './reporters/markdown.js'
 import { SUMMARY_LIMIT, writeSummary } from './reporters/summary.js'
 
@@ -25,6 +30,7 @@ const INPUTS = [
   'base-locale',
   'files',
   'fail-on',
+  'fail-on-existing',
   'comment',
   'annotations'
 ] as const
@@ -78,14 +84,24 @@ async function check(config: Config): Promise<void> {
     return
   }
 
-  const issues = analyze(project, { format: config.format })
+  const headIssues = analyze(project, { format: config.format })
+  const baseIssues =
+    pr && octokit ? await analyzeBase(octokit, context, config) : undefined
+  const issues = baseIssues ? markNew(headIssues, baseIssues) : headIssues
+  const hasBaseline = baseIssues !== undefined
   logIssues(issues)
 
   const link = lineLinker(context, pr?.headSha ?? context.sha)
-  const report = { issues, project, hasBaseline: false, link }
+  const report = { issues, project, hasBaseline, link }
 
   await writeSummary(renderReport({ ...report, maxLength: SUMMARY_LIMIT }))
-  if (config.annotations) annotate(issues, baseLocale)
+  if (config.annotations) {
+    // With a baseline, old issues are not annotated: they are not this PR's doing.
+    annotate(
+      hasBaseline ? issues.filter((issue) => issue.isNew) : issues,
+      baseLocale
+    )
+  }
   if (config.comment && pr && octokit) {
     await comment(
       octokit,
@@ -102,8 +118,9 @@ async function check(config: Config): Promise<void> {
   // F13
   const verdict = decide(issues, {
     failOn: config['fail-on'],
-    failOnExisting: true
+    failOnExisting: config['fail-on-existing']
   })
+  const existing = issues.filter((issue) => !issue.isNew).length
   if (verdict.failed) {
     core.setFailed(
       `Locale Guard found ${verdict.blocking.length} translation ${verdict.blocking.length === 1 ? 'issue' : 'issues'} (fail-on: ${config['fail-on']}).`
@@ -111,9 +128,40 @@ async function check(config: Config): Promise<void> {
   } else {
     core.info(
       issues.length
-        ? `Locale Guard found ${issues.length} issues, none blocking (fail-on: ${config['fail-on']}).`
+        ? `Locale Guard found ${issues.length} issues, none blocking (fail-on: ${config['fail-on']}${existing ? `, ${existing} already existed before this pull request` : ''}).`
         : 'All translations are in sync.'
     )
+  }
+}
+
+/**
+ * F9: runs the same checks on the base branch. Returns undefined when the base
+ * cannot be read, so every issue is treated as new instead of failing the run.
+ */
+async function analyzeBase(
+  octokit: Octokit,
+  context: RunContext,
+  config: Config
+): Promise<Issue[] | undefined> {
+  const pr = context.pullRequest
+  if (!pr) return undefined
+  try {
+    const source = await baseFileSource(
+      octokit,
+      context.repo,
+      pr.baseSha,
+      config.files
+    )
+    const project = await loadProject(source, {
+      patterns: config.files,
+      baseLocale: config['base-locale']
+    })
+    return analyze(project, { format: config.format })
+  } catch (error) {
+    core.warning(
+      `Could not read the locale files of the base branch, so every issue is treated as new. ${error instanceof Error ? error.message : ''}`
+    )
+    return undefined
   }
 }
 

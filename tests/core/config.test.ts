@@ -11,6 +11,7 @@ describe('parseConfig', () => {
           'base-locale': 'en',
           files: ['locales/{locale}.json'],
           'fail-on': 'error',
+          'fail-on-existing': false,
           comment: true,
           annotations: true
         }
