@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeOctokit, type FakeState } from './github/fake-octokit.js'
 
@@ -215,6 +216,75 @@ describe('run', () => {
     expect(core.setFailed).toHaveBeenCalledWith(
       'Base locale "de" was not found. Found: ar, en, fr. Check "base-locale" and "files".'
     )
+  })
+
+  describe('baseline (F9)', () => {
+    const fixture = (name: string) =>
+      readFileSync(`tests/fixtures/vue-project/locales/${name}.json`, 'utf8')
+    const sameAsHead = () => ({
+      'locales/en.json': fixture('en'),
+      'locales/ar.json': fixture('ar'),
+      'locales/fr.json': fixture('fr')
+    })
+
+    it('does not comment or fail when every issue already existed', async () => {
+      const { state } = setup({ state: { baseFiles: sameAsHead() } })
+
+      await run()
+
+      expect(state.comments).toHaveLength(0)
+      expect(core.setFailed).not.toHaveBeenCalled()
+      expect(core.error).not.toHaveBeenCalled()
+      expect(mocks.summary.text).toContain(
+        '✅ This pull request adds no new translation issues.'
+      )
+    })
+
+    it('reports only what the pull request added, and collapses the rest', async () => {
+      const base = sameAsHead()
+      base['locales/ar.json'] = base['locales/ar.json'].replace(
+        '"placed": "تم تقديم مزايدتك بقيمة {amount}"',
+        '"placed": "تم تقديم مزايدتك بقيمة {amount}",\n      "tooLow": "أعلى من {amount}"'
+      )
+      const { state } = setup({ state: { baseFiles: base } })
+
+      await run()
+
+      const body = state.comments[0]?.body ?? ''
+      expect(body).toContain('## 🌐 Locale Guard: 1 error\n')
+      expect(body).toMatch(
+        /New in this PR: 1 · Already existing: \d+ \(collapsed below\)/
+      )
+      expect(body).toContain('### ❌ ar: 1 missing key')
+      expect(core.error).toHaveBeenCalledTimes(1)
+      expect(core.setFailed).toHaveBeenCalledWith(
+        'Locale Guard found 1 translation issue (fail-on: error).'
+      )
+    })
+
+    it('fails on existing issues with fail-on-existing', async () => {
+      setup({
+        inputs: { 'fail-on-existing': 'true' },
+        state: { baseFiles: sameAsHead() }
+      })
+
+      await run()
+
+      expect(core.setFailed).toHaveBeenCalled()
+    })
+
+    it('treats every issue as new when the base branch cannot be read', async () => {
+      const { rest, state } = setup({ state: { baseFiles: sameAsHead() } })
+      rest.git.getTree.mockRejectedValueOnce(new Error('API down'))
+
+      await run()
+
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining('every issue is treated as new. API down')
+      )
+      expect(state.comments).toHaveLength(1)
+      expect(core.setFailed).toHaveBeenCalled()
+    })
   })
 
   it('explains when no file matches the pattern', async () => {

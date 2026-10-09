@@ -6,6 +6,61 @@ export interface FakeState {
   files: { filename: string; previous_filename?: string }[]
   /** HTTP status to throw on comment writes, e.g. 403 for a read-only token. */
   writeError?: number
+  /** Files of the base branch, served through the git trees and blobs API. */
+  baseFiles?: Record<string, string>
+}
+
+export const BASE_SHA = 'base-sha'
+
+/**
+ * Serves `baseFiles` like the git data API: the commit SHA is the root tree,
+ * folders are `tree:<dir>` and files are `blob:<path>`.
+ */
+function gitApi(files: Record<string, string>) {
+  const dirOf = (treeSha: string) =>
+    treeSha === BASE_SHA ? '' : treeSha.replace(/^tree:/, '')
+
+  return {
+    getTree: vi.fn(
+      async ({
+        tree_sha,
+        recursive
+      }: {
+        tree_sha: string
+        recursive?: string
+      }) => {
+        const dir = dirOf(tree_sha)
+        const prefix = dir ? `${dir}/` : ''
+        const below = Object.keys(files)
+          .filter((path) => path.startsWith(prefix))
+          .map((path) => path.slice(prefix.length))
+
+        const tree = recursive
+          ? below.map((path) => ({
+              path,
+              type: 'blob',
+              sha: `blob:${prefix}${path}`
+            }))
+          : [...new Set(below.map((path) => path.split('/')[0] as string))].map(
+              (name) =>
+                below.includes(name)
+                  ? { path: name, type: 'blob', sha: `blob:${prefix}${name}` }
+                  : { path: name, type: 'tree', sha: `tree:${prefix}${name}` }
+            )
+        return { data: { tree, truncated: false } }
+      }
+    ),
+    getBlob: vi.fn(async ({ file_sha }: { file_sha: string }) => {
+      const content = files[file_sha.replace(/^blob:/, '')]
+      if (content === undefined) throw new Error('blob not found')
+      return {
+        data: {
+          content: Buffer.from(content).toString('base64'),
+          encoding: 'base64'
+        }
+      }
+    })
+  }
 }
 
 /** A minimal Octokit stand-in that covers the endpoints Locale Guard uses. */
@@ -19,6 +74,7 @@ export function fakeOctokit(state: FakeState) {
   }
 
   const rest = {
+    git: gitApi(state.baseFiles ?? {}),
     pulls: { listFiles: vi.fn() },
     issues: {
       listComments: vi.fn(),
