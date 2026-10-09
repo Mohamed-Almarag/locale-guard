@@ -8,6 +8,39 @@ branding:
   icon: globe
   color: blue
 
+# Inputs have no `default` here on purpose: defaults are applied in code, so a
+# value from .localeguard.yml is not overridden by an input the user never set.
+inputs:
+  files:
+    description: >
+      Where the locale files are, with {locale} in place of the language code.
+      Several patterns can be given, one per line. Examples:
+      locales/{locale}.json, messages/{locale}.json, locales/{locale}/*.json
+    required: false
+  format:
+    description: 'Message format: vue-i18n, next-intl or json. Default: json.'
+    required: false
+  base-locale:
+    description: 'The locale every other locale is compared with. Default: en.'
+    required: false
+  fail-on:
+    description:
+      'When the check fails: error, warning or never. Default: error.'
+    required: false
+  comment:
+    description:
+      'Write a single pull request comment that is updated on every run.
+      Default: true.'
+    required: false
+  annotations:
+    description:
+      'Mark issues on their line in the "Files changed" tab. Default: true.'
+    required: false
+  github-token:
+    description: Token used to read the pull request and write the comment.
+    required: false
+    default: ${{ github.token }}
+
 runs:
   using: node24
   main: dist/index.js

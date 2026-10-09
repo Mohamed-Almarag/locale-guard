@@ -1,7 +1,7 @@
-import fg from 'fast-glob'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import picomatch from 'picomatch'
+import { glob } from 'tinyglobby'
 import type { Issue, Locale, LocaleFile, Project } from '../types.js'
 import { parseJson } from './json.js'
 import type { ParseResult } from './parsed.js'
@@ -18,9 +18,10 @@ export interface FileSource {
 export function localFileSource(root: string): FileSource {
   return {
     glob: (patterns) =>
-      fg(patterns, {
+      glob(patterns, {
         cwd: root,
         onlyFiles: true,
+        expandDirectories: false,
         ignore: ['**/node_modules/**']
       }),
     read: (path) => readFile(join(root, path), 'utf8')
