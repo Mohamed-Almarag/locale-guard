@@ -10,7 +10,7 @@ vue-i18n messages. Base locale: `en`. Each issue below is intentional.
 | `auction.oldKey` | not in base | F3 extra-keys |
 | `common.cancel` | empty value | F4 empty-values |
 | `inbox.greeting` | missing `{name}` | F5 placeholder-mismatch |
-| `auction.saveBid` | links to `@:common.sav`, which does not exist | F6 broken-linked-messages |
+| `auction.saveBid` | links to `@:common.sav`, which does not exist (F5 does not compare links) | F6 broken-linked-messages |
 | `common.ok` | identical to base (`OK`), should be ignorable | F7 untranslated |
 | `cart.items` | one plural branch, base has three | F8 plural-forms |
 

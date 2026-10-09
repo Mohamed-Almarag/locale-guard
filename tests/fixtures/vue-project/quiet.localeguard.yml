@@ -1,0 +1,8 @@
+# Used by tests/main.test.ts through the config-file input.
+files: locales/{locale}.json
+format: vue-i18n
+fail-on: never
+ignore-keys:
+  - auction.*
+ignore-values:
+  - OK

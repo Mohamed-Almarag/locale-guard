@@ -287,6 +287,65 @@ describe('run', () => {
     })
   })
 
+  describe('config file (F17)', () => {
+    it('reads settings and ignore rules from the file', async () => {
+      const { state } = setup({
+        inputs: {
+          files: '',
+          format: '',
+          'config-file': 'quiet.localeguard.yml'
+        }
+      })
+
+      await run()
+
+      const body = state.comments[0]?.body ?? ''
+      expect(core.info).toHaveBeenCalledWith(
+        'Using settings from quiet.localeguard.yml'
+      )
+      expect(body).not.toContain('auction.')
+      expect(body).not.toContain('common.ok')
+      expect(body).toContain('inbox.greeting')
+      expect(core.setFailed).not.toHaveBeenCalled()
+    })
+
+    it('lets inputs win over the file', async () => {
+      setup({
+        inputs: {
+          files: '',
+          format: '',
+          'fail-on': 'error',
+          'config-file': 'quiet.localeguard.yml'
+        }
+      })
+
+      await run()
+
+      expect(core.setFailed).toHaveBeenCalled()
+    })
+
+    it('explains a wrong value in the file', async () => {
+      setup({ inputs: { 'config-file': 'broken.localeguard.yml' } })
+
+      await run()
+
+      expect(core.setFailed).toHaveBeenCalledWith(
+        'Locale Guard settings are not valid:\nInvalid "fail-on" in broken.localeguard.yml: expected one of error, warning, never (got "sometimes")'
+      )
+    })
+
+    it('runs when only the config file changed', async () => {
+      const { rest } = setup({
+        inputs: { 'config-file': 'quiet.localeguard.yml' },
+        state: { files: [{ filename: 'quiet.localeguard.yml' }] }
+      })
+
+      await run()
+
+      expect(rest.issues.createComment).toHaveBeenCalled()
+    })
+  })
+
   it('explains when no file matches the pattern', async () => {
     setup({
       inputs: { files: 'nothing/{locale}.json' },

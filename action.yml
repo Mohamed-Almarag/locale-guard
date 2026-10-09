@@ -40,6 +40,30 @@ inputs:
     description:
       'Mark issues on their line in the "Files changed" tab. Default: true.'
     required: false
+  ignore-keys:
+    description:
+      'Key patterns to skip, one per line or comma separated, e.g. legacy.*'
+    required: false
+  ignore-locales:
+    description:
+      'Locales to skip, e.g. locales that are still being translated.'
+    required: false
+  ignore-values:
+    description:
+      'Values that may stay untranslated, e.g. brand names like "Google" or
+      "OK".'
+    required: false
+  disable-checks:
+    description: >
+      Checks to turn off: missing-keys, extra-keys, empty-values,
+      invalid-syntax, placeholder-mismatch, broken-linked-messages,
+      untranslated, plural-forms, parse-error.
+    required: false
+  config-file:
+    description:
+      'Optional settings file. Inputs that are set win over it. Default:
+      .localeguard.yml'
+    required: false
   github-token:
     description: Token used to read the pull request and write the comment.
     required: false

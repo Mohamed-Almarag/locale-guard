@@ -1,9 +1,21 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { analyze } from './core/analyze.js'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { type AnalyzeOptions, analyze } from './core/analyze.js'
 import { markNew } from './core/baseline.js'
-import { type Config, parseConfig } from './core/config.js'
-import { loadProject, localFileSource } from './core/loaders/index.js'
+import {
+  CONFIG_FILE,
+  type Config,
+  type ConfigFile,
+  parseConfig,
+  readConfigFile
+} from './core/config.js'
+import {
+  type LoadOptions,
+  loadProject,
+  localFileSource
+} from './core/loaders/index.js'
 import { decide } from './core/policy.js'
 import type { Issue } from './core/types.js'
 import { annotate } from './github/annotations.js'
@@ -32,13 +44,26 @@ const INPUTS = [
   'fail-on',
   'fail-on-existing',
   'comment',
-  'annotations'
+  'annotations',
+  'ignore-keys',
+  'ignore-locales',
+  'ignore-values',
+  'disable-checks'
 ] as const
 
 export async function run(): Promise<void> {
   try {
+    const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd()
+    const configPath = core.getInput('config-file') || CONFIG_FILE
+    const file = await loadConfigFile(workspace, configPath)
+    if (typeof file === 'string') {
+      core.setFailed(file)
+      return
+    }
+
     const parsed = parseConfig(
-      Object.fromEntries(INPUTS.map((name) => [name, core.getInput(name)]))
+      Object.fromEntries(INPUTS.map((name) => [name, core.getInput(name)])),
+      file
     )
     if (!parsed.ok) {
       core.setFailed(
@@ -46,20 +71,28 @@ export async function run(): Promise<void> {
       )
       return
     }
-    await check(parsed.config)
+    await check(parsed.config, workspace, configPath)
   } catch (error) {
     core.setFailed(error instanceof Error ? error.message : String(error))
   }
 }
 
-async function check(config: Config): Promise<void> {
+async function check(
+  config: Config,
+  workspace: string,
+  configPath: string
+): Promise<void> {
   const context = readRunContext()
   const token = core.getInput('github-token')
   const octokit = token ? github.getOctokit(token) : undefined
   const pr = context.pullRequest
 
   // F15: leave quickly when the pull request does not touch translations.
-  if (pr && octokit && (await skipPullRequest(octokit, context, config))) {
+  if (
+    pr &&
+    octokit &&
+    (await skipPullRequest(octokit, context, config, configPath))
+  ) {
     core.info('No locale files changed in this pull request. Nothing to check.')
     await writeSummary(
       '## 🌐 Locale Guard\n\nNo locale files changed in this pull request.\n'
@@ -68,11 +101,10 @@ async function check(config: Config): Promise<void> {
   }
 
   const baseLocale = config['base-locale']
-  const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd()
-  const project = await loadProject(localFileSource(workspace), {
-    patterns: config.files,
-    baseLocale
-  })
+  const project = await loadProject(
+    localFileSource(workspace),
+    loadOptions(config)
+  )
 
   if (!project.locales.has(baseLocale)) {
     const found = [...project.locales.keys()]
@@ -84,7 +116,7 @@ async function check(config: Config): Promise<void> {
     return
   }
 
-  const headIssues = analyze(project, { format: config.format })
+  const headIssues = analyze(project, analyzeOptions(config))
   const baseIssues =
     pr && octokit ? await analyzeBase(octokit, context, config) : undefined
   const issues = baseIssues ? markNew(headIssues, baseIssues) : headIssues
@@ -152,11 +184,8 @@ async function analyzeBase(
       pr.baseSha,
       config.files
     )
-    const project = await loadProject(source, {
-      patterns: config.files,
-      baseLocale: config['base-locale']
-    })
-    return analyze(project, { format: config.format })
+    const project = await loadProject(source, loadOptions(config))
+    return analyze(project, analyzeOptions(config))
   } catch (error) {
     core.warning(
       `Could not read the locale files of the base branch, so every issue is treated as new. ${error instanceof Error ? error.message : ''}`
@@ -165,16 +194,49 @@ async function analyzeBase(
   }
 }
 
+function loadOptions(config: Config): LoadOptions {
+  return {
+    patterns: config.files,
+    baseLocale: config['base-locale'],
+    ignoreLocales: config['ignore-locales']
+  }
+}
+
+function analyzeOptions(config: Config): AnalyzeOptions {
+  return {
+    format: config.format,
+    disabledChecks: config['disable-checks'],
+    ignoreKeys: config['ignore-keys'],
+    ignoreValues: config['ignore-values']
+  }
+}
+
+/** F17: the optional config file. Undefined when there is none, a message when it is broken. */
+async function loadConfigFile(
+  workspace: string,
+  path: string
+): Promise<ConfigFile | string | undefined> {
+  let text: string
+  try {
+    text = await readFile(join(workspace, path), 'utf8')
+  } catch {
+    return undefined
+  }
+  core.info(`Using settings from ${path}`)
+  return readConfigFile(path, text)
+}
+
 async function skipPullRequest(
   octokit: Octokit,
   context: RunContext,
-  config: Config
+  config: Config,
+  configPath: string
 ): Promise<boolean> {
   const pr = context.pullRequest
   if (!pr) return false
   try {
     const changed = await listChangedFiles(octokit, context.repo, pr.number)
-    if (touchesLocales(changed, config.files)) return false
+    if (touchesLocales(changed, config.files, [configPath])) return false
     // A previous run left a comment, e.g. before a fix reverted the locale
     // changes. Run again so the comment does not show stale issues.
     return !(

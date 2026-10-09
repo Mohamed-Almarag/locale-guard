@@ -1,23 +1,38 @@
-import { checks } from './checks/index.js'
+import picomatch from 'picomatch'
 import { createContext } from './checks/context.js'
+import { checks } from './checks/index.js'
 import type { CheckId, Format, Issue, Project } from './types.js'
 
 export interface AnalyzeOptions {
   format: Format
+  /** Checks to skip, by name. */
   disabledChecks?: CheckId[]
+  /** F16: key globs to leave out, e.g. `legacy.*`. */
+  ignoreKeys?: string[]
+  /** F16: values allowed to stay untranslated, e.g. brand names. */
+  ignoreValues?: string[]
 }
 
 /** Runs every enabled check on a loaded project. Never touches files or GitHub. */
 export function analyze(project: Project, options: AnalyzeOptions): Issue[] {
-  const context = createContext(project, options.format)
-  if (!context) return sortIssues(project.parseErrors)
-
   const disabled = new Set(options.disabledChecks ?? [])
-  const issues = [...project.parseErrors]
-  for (const [id, check] of Object.entries(checks)) {
-    if (!disabled.has(id as CheckId)) issues.push(...check(context))
+  const issues = disabled.has('parse-error') ? [] : [...project.parseErrors]
+
+  const context = createContext(project, options.format, options.ignoreValues)
+  if (context) {
+    for (const [id, check] of Object.entries(checks)) {
+      if (!disabled.has(id as CheckId)) issues.push(...check(context))
+    }
   }
-  return sortIssues(issues)
+
+  const ignoreKeys = options.ignoreKeys?.length
+    ? picomatch(options.ignoreKeys)
+    : undefined
+  return sortIssues(
+    ignoreKeys
+      ? issues.filter((issue) => !issue.key || !ignoreKeys(issue.key))
+      : issues
+  )
 }
 
 /** Errors first, then by locale, file and line. */

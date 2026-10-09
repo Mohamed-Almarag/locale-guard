@@ -83,6 +83,39 @@ describe('next-project fixture: placeholders', () => {
   })
 })
 
+const POLISH_CHECKS: CheckId[] = ['untranslated', 'plural-forms']
+
+describe('vue-project fixture: untranslated and plurals', () => {
+  it('finds untranslated values and a lost plural', async () => {
+    const issues = await analyzeFixture(
+      'vue-project',
+      'locales/{locale}.json',
+      'vue-i18n',
+      POLISH_CHECKS
+    )
+    expect(summarize(issues)).toEqual([
+      'ar common.ok:5 `common.ok`: same text as en',
+      'ar cart.items:15 `cart.items`: en has 3 plural forms separated by `|`, ar has 1',
+      'fr auction.bid.tooLow:10 `auction.bid.tooLow`: same text as en'
+    ])
+  })
+})
+
+describe('next-project fixture: untranslated and plurals', () => {
+  it('finds untranslated text and missing Arabic plural forms', async () => {
+    const issues = await analyzeFixture(
+      'next-project',
+      'messages/{locale}.json',
+      'next-intl',
+      POLISH_CHECKS
+    )
+    expect(summarize(issues)).toEqual([
+      'ar Checkout.total:3 `Checkout.total`: same text as en',
+      'ar Cart.items:6 `Cart.items`: Arabic uses zero, one, two, few, many, other. Missing: zero, two, few, many'
+    ])
+  })
+})
+
 describe('next-project fixture', () => {
   it('finds the key issues with their lines', async () => {
     const issues = await analyzeFixture(
