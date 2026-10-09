@@ -24,3 +24,10 @@ updates:
         dependency-type: production
         update-types:
           - patch
+    ignore:
+      # Types must match the runtime in action.yml (node24).
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      # Major TypeScript releases need a manual check with the Rollup plugin.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']

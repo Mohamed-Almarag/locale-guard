@@ -1,0 +1,61 @@
+import { describe, expect, it } from 'vitest'
+import { analyze } from '../../src/core/analyze.js'
+import { loadProject, localFileSource } from '../../src/core/loaders/index.js'
+import type { CheckId, Format, Issue } from '../../src/core/types.js'
+import { summarize } from '../helpers.js'
+
+async function analyzeFixture(
+  dir: string,
+  pattern: string,
+  format: Format,
+  only: CheckId[]
+): Promise<Issue[]> {
+  const project = await loadProject(localFileSource(`tests/fixtures/${dir}`), {
+    patterns: [pattern],
+    baseLocale: 'en'
+  })
+  return analyze(project, { format }).filter((issue) =>
+    only.includes(issue.check)
+  )
+}
+
+const KEY_CHECKS: CheckId[] = [
+  'parse-error',
+  'missing-keys',
+  'extra-keys',
+  'empty-values'
+]
+
+describe('vue-project fixture', () => {
+  it('finds the key issues with their lines', async () => {
+    const issues = await analyzeFixture(
+      'vue-project',
+      'locales/{locale}.json',
+      'vue-i18n',
+      KEY_CHECKS
+    )
+    expect(summarize(issues)).toEqual([
+      'ar auction.bid.tooLow:8 Missing key `auction.bid.tooLow`',
+      'ar common.cancel:4 Empty value for `common.cancel`',
+      'ar auction.oldKey:12 Key `auction.oldKey` does not exist in en'
+    ])
+    expect(issues[0]).toMatchObject({
+      file: 'locales/ar.json',
+      baseValue: 'Your bid must be higher than {amount}'
+    })
+  })
+})
+
+describe('next-project fixture', () => {
+  it('finds the key issues with their lines', async () => {
+    const issues = await analyzeFixture(
+      'next-project',
+      'messages/{locale}.json',
+      'next-intl',
+      KEY_CHECKS
+    )
+    expect(summarize(issues)).toEqual([
+      'ar Checkout.coupon.invalid:2 Missing key `Checkout.coupon.invalid`'
+    ])
+  })
+})
