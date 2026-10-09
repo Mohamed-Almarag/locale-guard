@@ -1,0 +1,17 @@
+{
+  "Checkout": {
+    "coupon": {
+      "invalid": "Coupon \"{code}\" is not valid"
+    },
+    "total": "Total: {amount, number, ::currency/USD}"
+  },
+  "Cart": {
+    "items": "{count, plural, one {# item} other {# items}}"
+  },
+  "Terms": {
+    "agree": "I agree to the <link>terms of service</link>"
+  },
+  "Profile": {
+    "welcome": "{gender, select, female {Welcome back, ma'am} male {Welcome back, sir} other {Welcome back}}"
+  }
+}

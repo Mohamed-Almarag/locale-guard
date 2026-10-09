@@ -1,0 +1,20 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "ok": "OK"
+  },
+  "auction": {
+    "bid": {
+      "placed": "Votre enchère de {amout} a été placée",
+      "tooLow": "Your bid must be higher than {amount}"
+    },
+    "saveBid": "@:common.save l'enchère"
+  },
+  "cart": {
+    "items": "aucun article | un article | {count} articles"
+  },
+  "inbox": {
+    "greeting": "Bonjour {name}, vous avez {0} nouveaux messages"
+  }
+}

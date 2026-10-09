@@ -1,0 +1,20 @@
+{
+  "common": {
+    "save": "حفظ",
+    "cancel": "",
+    "ok": "OK"
+  },
+  "auction": {
+    "bid": {
+      "placed": "تم تقديم مزايدتك بقيمة {amount}"
+    },
+    "saveBid": "@:common.sav المزايدة",
+    "oldKey": "مفتاح قديم"
+  },
+  "cart": {
+    "items": "{count} عناصر"
+  },
+  "inbox": {
+    "greeting": "مرحبًا، لديك {0} رسائل جديدة"
+  }
+}

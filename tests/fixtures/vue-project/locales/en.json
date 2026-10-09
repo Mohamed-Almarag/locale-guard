@@ -1,0 +1,20 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "ok": "OK"
+  },
+  "auction": {
+    "bid": {
+      "placed": "Your bid of {amount} was placed",
+      "tooLow": "Your bid must be higher than {amount}"
+    },
+    "saveBid": "@:common.save bid"
+  },
+  "cart": {
+    "items": "no items | one item | {count} items"
+  },
+  "inbox": {
+    "greeting": "Hello {name}, you have {0} new messages"
+  }
+}
