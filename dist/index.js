@@ -86538,12 +86538,7 @@ function count(n, singular, plural) {
  */
 async function upsertComment(octokit, repo, issueNumber, body, options) {
     try {
-        const comments = await octokit.paginate(octokit.rest.issues.listComments, {
-            ...repo,
-            issue_number: issueNumber,
-            per_page: 100
-        });
-        const existing = comments.find((comment) => comment.body?.includes(MARKER));
+        const existing = await findComment(octokit, repo, issueNumber);
         if (existing) {
             if (existing.body === body) {
                 return { status: 'unchanged', url: existing.html_url };
@@ -86575,6 +86570,15 @@ async function upsertComment(octokit, repo, issueNumber, body, options) {
         }
         throw error;
     }
+}
+/** The Locale Guard comment on a pull request, found by its hidden marker. */
+async function findComment(octokit, repo, issueNumber) {
+    const comments = await octokit.paginate(octokit.rest.issues.listComments, {
+        ...repo,
+        issue_number: issueNumber,
+        per_page: 100
+    });
+    return comments.find((comment) => comment.body?.includes(MARKER));
 }
 
 function readRunContext(context$1 = context) {
@@ -86708,7 +86712,11 @@ async function skipPullRequest(octokit, context, config) {
         return false;
     try {
         const changed = await listChangedFiles(octokit, context.repo, pr.number);
-        return !touchesLocales(changed, config.files);
+        if (touchesLocales(changed, config.files))
+            return false;
+        // A previous run left a comment, e.g. before a fix reverted the locale
+        // changes. Run again so the comment does not show stale issues.
+        return !(config.comment && (await findComment(octokit, context.repo, pr.number)));
     }
     catch (error) {
         warning(`Could not list the files of this pull request, so every locale file is checked. ${error instanceof Error ? error.message : ''}`);
@@ -86744,7 +86752,7 @@ async function comment(octokit, context, body, issues) {
 function logIssues(issues) {
     if (issues.length === 0)
         return;
-    startGroup(`Locale Guard: ${issues.length} issues`);
+    startGroup(`Locale Guard: ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`);
     for (const issue of issues) {
         info(`${issue.severity} ${issue.locale} ${issue.file}${issue.line ? `:${issue.line}` : ''} ${issue.message.replace(/`/g, '')}`);
     }
