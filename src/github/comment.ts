@@ -7,7 +7,7 @@ export type CommentResult =
   | { status: 'forbidden'; message: string }
 
 /**
- * F10: keeps a single Locale Guard comment per pull request. It finds the
+ * Keeps a single Locale Guard comment per pull request. It finds the
  * comment by its hidden marker and edits it, so every run updates the same one.
  *
  * A new comment is only created when `createIfMissing` is set, so a clean pull
@@ -44,7 +44,7 @@ export async function upsertComment(
     })
     return { status: 'created', url: data.html_url }
   } catch (error) {
-    // F14: read-only tokens (forks, Dependabot) or missing `pull-requests: write`.
+    // Read-only tokens (forks, Dependabot) or missing `pull-requests: write`.
     const status = (error as { status?: number }).status
     if (status === 403 || status === 404) {
       return {

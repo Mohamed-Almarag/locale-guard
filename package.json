@@ -2,7 +2,7 @@
   "name": "locale-guard",
   "description": "GitHub Action that checks translation files on every pull request",
   "version": "0.0.0",
-  "author": "Mohamed Almarag",
+  "author": "Mohamed Almearag",
   "type": "module",
   "private": true,
   "homepage": "https://github.com/Mohamed-Almarag/locale-guard",
@@ -32,7 +32,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "local-action": "local-action . src/main.ts .env",
     "package": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",
     "all": "npm run format:write && npm run lint && npm run typecheck && npm run test && npm run package",
     "check:dist": "npm run package && git diff --exit-code --stat HEAD -- dist"
@@ -53,7 +52,6 @@
     "@eslint/compat": "^2.0.2",
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^10.0.1",
-    "@github/local-action": "^7.0.1",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
@@ -66,6 +64,7 @@
     "lefthook": "^2.2.1",
     "prettier": "^3.8.1",
     "rollup": "^4.57.1",
+    "tslib": "^2.8.1",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   },

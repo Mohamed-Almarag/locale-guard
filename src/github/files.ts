@@ -7,7 +7,7 @@ import type { Octokit, RepoRef } from './context.js'
 const CONCURRENCY = 8
 
 /**
- * F9: reads the locale files of the base branch through the API, so users do
+ * Reads the locale files of the base branch through the API, so users do
  * not need `fetch-depth: 0` in actions/checkout.
  *
  * Only the folders the patterns can match are listed (e.g. `locales/` for
@@ -133,7 +133,7 @@ export async function listChangedFiles(
   )
 }
 
-/** F15: whether any changed file is a locale file or the config file. */
+/** Whether any changed file is a locale file or the config file. */
 export function touchesLocales(
   changed: string[],
   patterns: string[],

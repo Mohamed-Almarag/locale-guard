@@ -7,7 +7,7 @@ async function issues(files: Record<string, string>) {
   return analyze(await load(files), { format: 'next-intl' })
 }
 
-describe('markNew (F9)', () => {
+describe('markNew', () => {
   it('marks issues that already exist on the base branch as existing', async () => {
     const base = await issues({
       'locales/en.json': json({ a: 'A', b: 'B' }),

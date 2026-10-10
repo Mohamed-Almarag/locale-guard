@@ -4,7 +4,7 @@ import { json, run, summarize } from '../../helpers.js'
 const vue = { format: 'vue-i18n' as const }
 const icu = { format: 'next-intl' as const }
 
-describe('F5 placeholder-mismatch: vue-i18n', () => {
+describe('placeholder-mismatch: vue-i18n', () => {
   it('passes when named and list placeholders match, in any order', async () => {
     const issues = await run(
       'placeholder-mismatch',
@@ -101,7 +101,7 @@ describe('F5 placeholder-mismatch: vue-i18n', () => {
   })
 })
 
-describe('F5 placeholder-mismatch: ICU', () => {
+describe('placeholder-mismatch: ICU', () => {
   it('passes when arguments, plurals, selects and tags match', async () => {
     const issues = await run(
       'placeholder-mismatch',
@@ -170,7 +170,7 @@ describe('F5 placeholder-mismatch: ICU', () => {
   })
 })
 
-describe('F5 placeholder-mismatch: plain JSON', () => {
+describe('placeholder-mismatch: plain JSON', () => {
   it('passes when {name} and {{name}} placeholders match', async () => {
     const issues = await run('placeholder-mismatch', {
       'locales/en.json': json({ a: 'Hi {name}', b: 'Hi {{name}}' }),
@@ -234,7 +234,7 @@ describe('invalid-syntax', () => {
   })
 })
 
-describe('F6 broken-linked-messages', () => {
+describe('broken-linked-messages', () => {
   it('passes when every linked key exists in the same locale', async () => {
     const issues = await run(
       'broken-linked-messages',

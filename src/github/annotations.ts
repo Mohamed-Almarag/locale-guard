@@ -9,7 +9,7 @@ export const ANNOTATIONS_PER_SEVERITY = 10
 
 type Sink = Pick<typeof core, 'error' | 'warning' | 'notice'>
 
-/** F11: marks issues on their line in the "Files changed" tab. */
+/** Marks issues on their line in the "Files changed" tab. */
 export function annotate(
   issues: Issue[],
   baseLocale: string,

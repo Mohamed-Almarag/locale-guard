@@ -8,7 +8,7 @@ import { keyFor, neededForms } from './suffix-plurals.js'
 const EXACT: Record<string, string> = { '=0': 'zero', '=1': 'one', '=2': 'two' }
 
 /**
- * F8: plural messages that miss forms the language needs.
+ * Plural messages that miss forms the language needs.
  *
  * ICU (next-intl): the forms come from `Intl.PluralRules`, so every language
  * works without hand-written tables. A missing `other` is an error, since ICU

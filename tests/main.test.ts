@@ -218,7 +218,7 @@ describe('run', () => {
     )
   })
 
-  describe('baseline (F9)', () => {
+  describe('baseline', () => {
     const fixture = (name: string) =>
       readFileSync(`tests/fixtures/vue-project/locales/${name}.json`, 'utf8')
     const sameAsHead = () => ({
@@ -301,7 +301,7 @@ describe('run', () => {
     })
   })
 
-  describe('config file (F17)', () => {
+  describe('config file', () => {
     it('reads settings and ignore rules from the file', async () => {
       const { state } = setup({
         inputs: {
