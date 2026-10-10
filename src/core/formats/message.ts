@@ -1,12 +1,10 @@
-export type PluralInfo =
-  | {
-      kind: 'icu'
-      argument: string
-      ordinal: boolean
-      /** Option keys as written, e.g. `one`, `other`, `=0`. */
-      options: string[]
-    }
-  | { kind: 'vue'; branches: number }
+/** An ICU `plural` or `selectordinal` argument. */
+export interface PluralInfo {
+  argument: string
+  ordinal: boolean
+  /** Option keys as written, e.g. `one`, `other`, `=0`. */
+  options: string[]
+}
 
 /** What a check needs to know about one translated message, in any format. */
 export interface MessageInfo {

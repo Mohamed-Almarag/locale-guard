@@ -1,4 +1,3 @@
-import type { PluralInfo } from '../formats/index.js'
 import type { Issue, Locale } from '../types.js'
 import { intlLocale } from '../locale-code.js'
 import type { Check, CheckContext } from './context.js'
@@ -15,14 +14,12 @@ const EXACT: Record<string, string> = { '=0': 'zero', '=1': 'one', '=2': 'two' }
  * works without hand-written tables. A missing `other` is an error, since ICU
  * requires it.
  *
- * vue-i18n: branch counts may legitimately differ with custom plural rules, so
- * only a single branch where the base has several is reported.
+ * Only ICU is checked. vue-i18n plurals are `|` branches whose count depends
+ * on custom rules, and a single branch is often correct ("{count} mois" in
+ * French, "{count} ay" in Turkish), so a real project showed only false alarms.
  */
-export const pluralForms: Check = (context) => {
-  if (context.format === 'next-intl') return icuPlurals(context)
-  if (context.format === 'vue-i18n') return vuePlurals(context)
-  return []
-}
+export const pluralForms: Check = (context) =>
+  context.format === 'next-intl' ? icuPlurals(context) : []
 
 function icuPlurals({ base, targets, describe }: CheckContext): Issue[] {
   const issues: Issue[] = []
@@ -33,7 +30,6 @@ function icuPlurals({ base, targets, describe }: CheckContext): Issue[] {
 
     for (const [key, entry] of locale.entries) {
       for (const plural of describe(entry.value).plurals) {
-        if (plural.kind !== 'icu') continue
         const required = requiredCategories(code, plural.ordinal)
         const present = new Set(
           plural.options.map((option) => EXACT[option] ?? option)
@@ -59,30 +55,6 @@ function icuPlurals({ base, targets, describe }: CheckContext): Issue[] {
   return issues
 }
 
-function vuePlurals({ base, targets, describe }: CheckContext): Issue[] {
-  const issues: Issue[] = []
-
-  for (const target of targets) {
-    for (const [key, entry] of target.entries) {
-      const baseEntry = base.entries.get(key)
-      if (!baseEntry || !entry.value.trim()) continue
-      const expected = branches(describe(baseEntry.value).plurals)
-      const actual = branches(describe(entry.value).plurals)
-      if (expected <= 1 || actual > 1) continue
-
-      issues.push(
-        issue(target, key, entry, {
-          severity: 'warning',
-          message: `\`${key}\`: ${base.code} has ${expected} plural forms separated by \`|\`, ${target.code} has 1`,
-          baseValue: baseEntry.value
-        })
-      )
-    }
-  }
-
-  return issues
-}
-
 /**
  * Categories a message must cover: the ones that whole numbers from 0 to 1000
  * reach, plus `other`. This leaves out forms that only apply to millions or
@@ -102,11 +74,6 @@ function requiredCategories(locale: string, ordinal: boolean): string[] {
   const required = ORDER.filter((category) => used.has(category))
   requiredCache.set(id, required)
   return required
-}
-
-function branches(plurals: PluralInfo[]): number {
-  const vue = plurals.find((plural) => plural.kind === 'vue')
-  return vue?.kind === 'vue' ? vue.branches : 1
 }
 
 function languageName(code: string): string {

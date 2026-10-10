@@ -53,7 +53,6 @@ export function describeIcuMessage(source: string): MessageInfo {
         case TYPE.plural:
           placeholders.push(`{${node.value}}`)
           plurals.push({
-            kind: 'icu',
             argument: node.value,
             ordinal: node.pluralType === 'ordinal',
             options: Object.keys(node.options)

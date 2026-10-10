@@ -230,31 +230,18 @@ describe('F8 plural-forms: ICU', () => {
   })
 })
 
-describe('F8 plural-forms: vue-i18n', () => {
-  it('passes when the translation has plural branches too', async () => {
+describe('F8 plural-forms: other formats', () => {
+  it('does not run for vue-i18n, where one branch is often right', async () => {
     const issues = await run(
       'plural-forms',
       {
-        'locales/en.json': json({ a: 'no items | one item | {n} items' }),
-        'locales/ar.json': json({ a: 'لا عناصر | عنصر | {n} عناصر | عنصران' })
+        'locales/en.json': json({ a: '{count} month | {count} months' }),
+        'locales/fr.json': json({ a: '{count} mois' }),
+        'locales/tr.json': json({ a: '{count} ay' })
       },
       vue
     )
     expect(issues).toEqual([])
-  })
-
-  it('reports a single branch where the base has several', async () => {
-    const issues = await run(
-      'plural-forms',
-      {
-        'locales/en.json': json({ a: 'no items | one item | {n} items' }),
-        'locales/ar.json': json({ a: '{n} عناصر' })
-      },
-      vue
-    )
-    expect(summarize(issues)).toEqual([
-      'ar a:2 `a`: en has 3 plural forms separated by `|`, ar has 1'
-    ])
   })
 
   it('does not run for plain JSON', async () => {
