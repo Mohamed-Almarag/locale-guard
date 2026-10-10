@@ -120,6 +120,31 @@ describe('renderReport', () => {
     expect(body).toContain('#### ❌ ar: 2 missing keys')
   })
 
+  it('shares one table between locales that miss the same keys', async () => {
+    const body = await report({
+      'locales/en.json': json({ a: 'A', b: 'B' }),
+      'locales/ar.json': json({}),
+      'locales/fr.json': json({}),
+      'locales/de.json': json({ a: 'A-de' })
+    })
+    expect(body).toContain(
+      [
+        '### ❌ 2 locales: 2 missing keys',
+        '',
+        'Missing in `ar`, `fr`.',
+        '',
+        '| Key | en |',
+        '|---|---|',
+        '| [`a`](https://x/locales/en.json#L2) | A |',
+        '| [`b`](https://x/locales/en.json#L3) | B |',
+        '',
+        '<details><summary>📋 Copy-paste for locales/{locale}.json (the same in each locale)</summary>'
+      ].join('\n')
+    )
+    expect(body).toContain('### ❌ de: 1 missing key')
+    expect(body.match(/Copy-paste for/g)).toHaveLength(2)
+  })
+
   it('can show existing issues as a count table, to keep the comment small', async () => {
     const body = await report(
       {

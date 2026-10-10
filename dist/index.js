@@ -86684,7 +86684,7 @@ function renderReport(input) {
         body += `\nNew in this PR: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ' (collapsed below)' : ''}\n`;
     }
     let omitted = 0;
-    for (const group of groupIssues(fresh)) {
+    for (const group of mergeMissingKeys(groupIssues(fresh))) {
         const section = `\n${renderGroup(group, input, '###')}`;
         if (body.length + section.length > limit)
             omitted += group.issues.length;
@@ -86748,6 +86748,7 @@ function groupIssues(issues) {
         const group = groups.get(id) ?? {
             severity: issue.severity,
             locale: issue.locale,
+            locales: [issue.locale],
             check: issue.check,
             issues: []
         };
@@ -86758,7 +86759,43 @@ function groupIssues(issues) {
         a.locale.localeCompare(b.locale) ||
         CHECK_ORDER.indexOf(a.check) - CHECK_ORDER.indexOf(b.check));
 }
+/**
+ * A new key added to the base locale is usually missing in every other locale
+ * at once. Instead of repeating the same table for each locale, locales that
+ * miss exactly the same keys share one section.
+ */
+function mergeMissingKeys(groups) {
+    const merged = [];
+    const bySignature = new Map();
+    for (const group of groups) {
+        if (group.check !== 'missing-keys') {
+            merged.push(group);
+            continue;
+        }
+        const signature = group.issues
+            .map((issue) => issue.key)
+            .sort()
+            .join('\u0000');
+        const same = bySignature.get(signature);
+        if (same) {
+            same.locales.push(group.locale);
+            same.issues.push(...group.issues);
+        }
+        else {
+            const copy = {
+                ...group,
+                locales: [group.locale],
+                issues: [...group.issues]
+            };
+            bySignature.set(signature, copy);
+            merged.push(copy);
+        }
+    }
+    return merged;
+}
 function renderGroup(group, input, heading) {
+    if (group.locales.length > 1)
+        return renderSharedMissingKeys(group, input, heading);
     const icon = group.severity === 'error' ? '❌' : '⚠️';
     const [singular, plural] = LABELS[group.check];
     let out = `${heading} ${icon} ${group.locale}: ${count(group.issues.length, singular, plural)}\n\n`;
@@ -86777,6 +86814,37 @@ function renderGroup(group, input, heading) {
     }
     return out;
 }
+/** One table for keys that are missing in several locales, linked to the base file. */
+function renderSharedMissingKeys(group, input, heading) {
+    const { project } = input;
+    const base = project.locales.get(project.baseLocale);
+    const first = group.issues.filter((issue) => issue.locale === group.locale);
+    const locales = group.locales.map((code) => `\`${code}\``).join(', ');
+    let out = `${heading} ❌ ${group.locales.length} locales: ${count(first.length, 'missing key', 'missing keys')}\n\n`;
+    out += `Missing in ${locales}.\n\n`;
+    out += `| Key | ${project.baseLocale} |\n|---|---|\n`;
+    for (const issue of first) {
+        const entry = base?.entries.get(issue.key);
+        const url = entry ? input.link?.(entry.file, entry.line) : undefined;
+        const key = `\`${issue.key}\``;
+        out += `| ${url ? `[${key}](${url})` : key} | ${cell(issue.baseValue ?? '')} |\n`;
+    }
+    for (const [file, fileIssues] of byFile(first)) {
+        out += copyPasteBlock(`Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale)`, file, fileIssues, project);
+    }
+    return out;
+}
+/** `locales/ar/common.json` becomes `locales/{locale}/common.json`. */
+function withLocalePlaceholder(path, locale) {
+    return path
+        .split('/')
+        .map((segment) => segment === locale
+        ? '{locale}'
+        : segment.startsWith(`${locale}.`)
+            ? `{locale}${segment.slice(locale.length)}`
+            : segment)
+        .join('/');
+}
 function location(issue, input) {
     const name = issue.file.split('/').pop() ?? issue.file;
     const label = issue.line ? `${name}:${issue.line}` : name;
@@ -86789,23 +86857,29 @@ function linked(text, issue, input) {
 }
 /** Ready-to-paste nested object with the missing keys and empty values, one block per file. */
 function copyPaste(issues, project) {
-    const base = project.locales.get(project.baseLocale);
-    const byFile = new Map();
-    for (const issue of issues) {
-        byFile.set(issue.file, [...(byFile.get(issue.file) ?? []), issue]);
-    }
     let out = '';
-    for (const [file, fileIssues] of byFile) {
-        const tree = {};
-        for (const issue of fileIssues) {
-            const fileKey = base?.entries.get(issue.key)?.fileKey ?? issue.key;
-            setPath(tree, fileKey.split('.'), '');
-        }
-        const yaml = /\.ya?ml$/i.test(file);
-        const code = yaml ? stringify(tree).trimEnd() : JSON.stringify(tree, null, 2);
-        out += `\n<details><summary>📋 Copy-paste for ${file}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`;
+    for (const [file, fileIssues] of byFile(issues)) {
+        out += copyPasteBlock(`Copy-paste for ${file}`, file, fileIssues, project);
     }
     return out;
+}
+function copyPasteBlock(summary, file, issues, project) {
+    const base = project.locales.get(project.baseLocale);
+    const tree = {};
+    for (const issue of issues) {
+        const fileKey = base?.entries.get(issue.key)?.fileKey ?? issue.key;
+        setPath(tree, fileKey.split('.'), '');
+    }
+    const yaml = /\.ya?ml$/i.test(file);
+    const code = yaml ? stringify(tree).trimEnd() : JSON.stringify(tree, null, 2);
+    return `\n<details><summary>📋 ${summary}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`;
+}
+function byFile(issues) {
+    const files = new Map();
+    for (const issue of issues) {
+        files.set(issue.file, [...(files.get(issue.file) ?? []), issue]);
+    }
+    return files;
 }
 function setPath(tree, path, value) {
     let node = tree;
