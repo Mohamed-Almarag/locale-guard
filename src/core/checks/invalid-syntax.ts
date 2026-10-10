@@ -21,7 +21,7 @@ export const invalidSyntax: Check = ({ base, targets, describe }) => {
         key,
         line: entry.line,
         column: entry.column,
-        message: error,
+        message: `\`${key}\`: ${error}`,
         baseValue: locale === base ? undefined : base.entries.get(key)?.value,
         isNew: true
       })
