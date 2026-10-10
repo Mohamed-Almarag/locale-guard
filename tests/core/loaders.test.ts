@@ -89,6 +89,19 @@ describe('parseYaml', () => {
     expect(parseYaml('')).toEqual({ ok: true, entries: [], nodes: [] })
   })
 
+  it('treats a file with only a document marker or comments as no keys', () => {
+    const empty = { ok: true, entries: [], nodes: [] }
+    expect(parseYaml('---\r\n')).toEqual(empty)
+    expect(parseYaml('# translated later\n')).toEqual(empty)
+  })
+
+  it('still rejects a scalar at the top level', () => {
+    expect(parseYaml('just text\n')).toMatchObject({
+      ok: false,
+      message: 'Expected a map of keys at the top level'
+    })
+  })
+
   it('reports invalid YAML with its line', () => {
     const result = parseYaml('a: 1\nb: [1, 2\nc: 3\n')
     expect(result).toMatchObject({ ok: false, line: expect.any(Number) })

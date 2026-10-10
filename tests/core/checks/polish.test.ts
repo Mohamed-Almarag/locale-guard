@@ -142,11 +142,11 @@ describe('F7 untranslated: values shared by two locales', () => {
         severity: 'warning',
         locale: 'fr',
         file: 'locales/fr.json',
-        key: 'title',
+        key: '',
         line: 2,
         column: 3,
         message:
-          'fr and tr have 2 identical values, so one file was probably copied into the other',
+          'fr and tr have identical values, so one file was probably copied into the other',
         details: ['`title`: Şifre Değiştir', '`done`: Şifre Değiştirildi'],
         isNew: true
       }
@@ -163,6 +163,55 @@ describe('F7 untranslated: values shared by two locales', () => {
       'locales/fr.json': json({ drive: 'Google Drive', save: 'Enregistrer' })
     })
     expect(issues).toEqual([])
+  })
+
+  it('counts a value used by several keys once', async () => {
+    const issues = await run('untranslated', {
+      'locales/en.json': json({ a: 'Email address', b: 'Email address' }),
+      'locales/fr.json': json({ a: 'Adresse e-mail', b: 'Adresse e-mail' }),
+      'locales/it.json': json({ a: 'Adresse e-mail', b: 'Adresse e-mail' })
+    })
+    expect(issues).toEqual([])
+  })
+
+  it('keeps words with combining marks whole, like Hindi', async () => {
+    const issues = await run('untranslated', {
+      'locales/en.json': json({ a: 'Published', b: 'Archived' }),
+      'locales/hi.json': json({ a: 'प्रकाशित', b: 'संग्रहित' }),
+      'locales/ne.json': json({ a: 'प्रकाशित', b: 'संग्रहित' })
+    })
+    expect(issues).toEqual([])
+  })
+
+  it('does not count formats like H:mm:ss as text', async () => {
+    const issues = await run('untranslated', {
+      'locales/en.json': json({ a: 'h:mm:ss a', b: 'h:mm a', c: 'MMM d' }),
+      'locales/de.json': json({ a: 'H:mm:ss', b: 'H:mm', c: 'd MMM u' }),
+      'locales/nl.json': json({ a: 'H:mm:ss', b: 'H:mm', c: 'd MMM u' })
+    })
+    expect(issues).toEqual([])
+  })
+
+  it('keeps the same message when some of the values get translated', async () => {
+    const files = (title: string) => ({
+      'locales/en.json': en,
+      'locales/fr.json': json({
+        title,
+        done: 'Şifre Değiştirildi',
+        save: 'Kaydet değişiklikleri'
+      }),
+      'locales/tr.json': json({
+        title: 'Şifre Değiştir',
+        done: 'Şifre Değiştirildi',
+        save: 'Kaydet değişiklikleri'
+      })
+    })
+    const before = await run('untranslated', files('Şifre Değiştir'))
+    const after = await run('untranslated', files('Changer le mot de passe'))
+    expect(before[0]?.details).toHaveLength(3)
+    expect(after[0]?.details).toHaveLength(2)
+    expect(after[0]?.message).toBe(before[0]?.message)
+    expect(after[0]?.key).toBe(before[0]?.key)
   })
 
   it('does not compare related languages, which often share whole sentences', async () => {

@@ -71569,7 +71569,10 @@ const SCRIPTS = {
 };
 const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g;
 const LETTER = /\p{L}/u;
-const WORD = /\p{L}+/gu;
+/** Letters plus combining marks, so Hindi or vowelled Arabic words stay whole; "E-mail" is one word. */
+const WORD = /[\p{L}\p{M}]+(?:[-'’][\p{L}\p{M}]+)*/gu;
+/** Words that carry meaning, so date formats like "H:mm:ss" are not counted as text. */
+const LONG_WORD = /[\p{L}\p{M}]{3,}/gu;
 /**
  * Languages close enough that whole sentences are often written the same way
  * ("Generar Factura" in Spanish and Catalan), or that share characters
@@ -71589,7 +71592,7 @@ const RELATED_LANGUAGES = [
     ['fa', 'prs'],
     ['nl', 'af']
 ];
-/** A pair of locales must share at least this many values to be reported. */
+/** A pair of locales must share at least this many different values to be reported. */
 const MIN_SHARED_VALUES = 2;
 /**
  * F7: text that was probably never translated.
@@ -71656,7 +71659,9 @@ const perValue = ({ base, targets, describe, ignoreValues }) => {
  *
  * One issue per pair of locales, with the keys as details, because it is one
  * mistake. It is attached to the first locale of the pair by name, since the
- * tool cannot tell which file is the wrong one.
+ * tool cannot tell which file is the wrong one. The message and key leave out
+ * the count and the keys, so the issue stays "existing" (F9) when a pull
+ * request translates some of the values.
  */
 const sharedValues = ({ base, targets, describe, ignoreValues }) => {
     const ignored = ignoredSet(ignoreValues);
@@ -71679,10 +71684,12 @@ const sharedValues = ({ base, targets, describe, ignoreValues }) => {
                 if (ignored.has(value.toLowerCase()))
                     continue;
                 const text = visibleText(describe, entry.value);
-                if (text !== undefined && wordCount(text) >= 2)
+                if (text !== undefined && wordCount(text, LONG_WORD) >= 2) {
                     shared.push(key);
+                }
             }
-            if (shared.length < MIN_SHARED_VALUES)
+            const values = new Set(shared.map((key) => first.entries.get(key)?.value.trim()));
+            if (values.size < MIN_SHARED_VALUES)
                 continue;
             const entry = first.entries.get(shared[0]);
             issues.push({
@@ -71690,10 +71697,10 @@ const sharedValues = ({ base, targets, describe, ignoreValues }) => {
                 severity: 'warning',
                 locale: first.code,
                 file: entry.file,
-                key: shared[0],
+                key: '',
                 line: entry.line,
                 column: entry.column,
-                message: `${first.code} and ${second.code} have ${shared.length} identical values, so one file was probably copied into the other`,
+                message: `${first.code} and ${second.code} have identical values, so one file was probably copied into the other`,
                 details: shared.map((key) => `\`${key}\`: ${first.entries.get(key)?.value.trim()}`),
                 isNew: true
             });
@@ -71712,8 +71719,8 @@ function visibleText(describe, value) {
     const info = describe(value);
     return info.error ? undefined : info.text.replace(URL_OR_EMAIL, ' ');
 }
-function wordCount(text) {
-    return text.match(WORD)?.length ?? 0;
+function wordCount(text, pattern = WORD) {
+    return text.match(pattern)?.length ?? 0;
 }
 function ignoredSet(values) {
     return new Set(values.map((value) => value.trim().toLowerCase()));
@@ -86579,8 +86586,11 @@ function parseYaml(text) {
             });
         }
     };
-    if (doc.contents === null)
+    // An empty file, or one with only `---` or comments: a locale with no keys yet.
+    const contents = doc.contents;
+    if (contents === null || (isScalar(contents) && contents.value === null)) {
         return { ok: true, entries, nodes };
+    }
     if (!isMap(doc.contents)) {
         return {
             ok: false,
@@ -86800,10 +86810,11 @@ function renderReport(input) {
         body += `${details}\n</details>\n`;
     }
     if (omitted > 0) {
-        const where = input.summaryUrl
-            ? `[job summary](${input.summaryUrl})`
-            : 'job summary';
-        body += `\n…and ${count(omitted, 'more issue', 'more issues')}, see the ${where}.\n`;
+        // Without a summary link this is the job summary itself, which has nowhere else to point.
+        const rest = input.summaryUrl
+            ? `, see the [job summary](${input.summaryUrl})`
+            : ' not shown, because this page reached its size limit';
+        body += `\n…and ${count(omitted, 'more issue', 'more issues')}${rest}.\n`;
     }
     return body;
 }

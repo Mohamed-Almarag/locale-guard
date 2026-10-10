@@ -35,7 +35,10 @@ const SCRIPTS: Record<string, { name: string; letters: RegExp }> = {
 
 const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
 const LETTER = /\p{L}/u
-const WORD = /\p{L}+/gu
+/** Letters plus combining marks, so Hindi or vowelled Arabic words stay whole; "E-mail" is one word. */
+const WORD = /[\p{L}\p{M}]+(?:[-'’][\p{L}\p{M}]+)*/gu
+/** Words that carry meaning, so date formats like "H:mm:ss" are not counted as text. */
+const LONG_WORD = /[\p{L}\p{M}]{3,}/gu
 
 /**
  * Languages close enough that whole sentences are often written the same way
@@ -57,7 +60,7 @@ const RELATED_LANGUAGES = [
   ['nl', 'af']
 ]
 
-/** A pair of locales must share at least this many values to be reported. */
+/** A pair of locales must share at least this many different values to be reported. */
 const MIN_SHARED_VALUES = 2
 
 /**
@@ -131,7 +134,9 @@ const perValue: Check = ({ base, targets, describe, ignoreValues }) => {
  *
  * One issue per pair of locales, with the keys as details, because it is one
  * mistake. It is attached to the first locale of the pair by name, since the
- * tool cannot tell which file is the wrong one.
+ * tool cannot tell which file is the wrong one. The message and key leave out
+ * the count and the keys, so the issue stays "existing" (F9) when a pull
+ * request translates some of the values.
  */
 const sharedValues: Check = ({ base, targets, describe, ignoreValues }) => {
   const ignored = ignoredSet(ignoreValues)
@@ -152,9 +157,14 @@ const sharedValues: Check = ({ base, targets, describe, ignoreValues }) => {
         if (second.entries.get(key)?.value.trim() !== value) continue
         if (ignored.has(value.toLowerCase())) continue
         const text = visibleText(describe, entry.value)
-        if (text !== undefined && wordCount(text) >= 2) shared.push(key)
+        if (text !== undefined && wordCount(text, LONG_WORD) >= 2) {
+          shared.push(key)
+        }
       }
-      if (shared.length < MIN_SHARED_VALUES) continue
+      const values = new Set(
+        shared.map((key) => first.entries.get(key)?.value.trim())
+      )
+      if (values.size < MIN_SHARED_VALUES) continue
 
       const entry = first.entries.get(shared[0] as string) as Entry
       issues.push({
@@ -162,10 +172,10 @@ const sharedValues: Check = ({ base, targets, describe, ignoreValues }) => {
         severity: 'warning',
         locale: first.code,
         file: entry.file,
-        key: shared[0] as string,
+        key: '',
         line: entry.line,
         column: entry.column,
-        message: `${first.code} and ${second.code} have ${shared.length} identical values, so one file was probably copied into the other`,
+        message: `${first.code} and ${second.code} have identical values, so one file was probably copied into the other`,
         details: shared.map(
           (key) => `\`${key}\`: ${first.entries.get(key)?.value.trim()}`
         ),
@@ -197,8 +207,8 @@ function visibleText(
   return info.error ? undefined : info.text.replace(URL_OR_EMAIL, ' ')
 }
 
-function wordCount(text: string): number {
-  return text.match(WORD)?.length ?? 0
+function wordCount(text: string, pattern = WORD): number {
+  return text.match(pattern)?.length ?? 0
 }
 
 function ignoredSet(values: string[]): Set<string> {

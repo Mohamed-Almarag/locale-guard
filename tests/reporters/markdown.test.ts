@@ -200,6 +200,27 @@ describe('renderReport', () => {
     )
   })
 
+  it('does not point the job summary at itself when it is cut', async () => {
+    const many = Object.fromEntries(
+      Array.from({ length: 400 }, (_, i) => [`key${i}`, `Value number ${i}`])
+    )
+    const project = await load({
+      'locales/en.json': json(many),
+      'locales/ar.json': json({}),
+      'locales/fr.json': json({})
+    })
+    const body = renderReport({
+      issues: analyze(project, { format: 'json' }),
+      project,
+      hasBaseline: false,
+      maxLength: 5_000
+    })
+    expect(body).toMatch(
+      /…and \d+ more issues not shown, because this page reached its size limit\./
+    )
+    expect(body).not.toContain('see the job summary')
+  })
+
   it('lists the keys of a grouped issue in a collapsed block', async () => {
     const body = await report({
       'locales/en.json': json({ a: 'Change password', b: 'Password changed' }),
@@ -208,7 +229,7 @@ describe('renderReport', () => {
     })
     expect(body).toContain(
       [
-        '- fr and tr have 2 identical values, so one file was probably copied into the other · [fr.json:2](https://x/locales/fr.json#L2)',
+        '- fr and tr have identical values, so one file was probably copied into the other · [fr.json:2](https://x/locales/fr.json#L2)',
         '  <details><summary>2 keys</summary>',
         '',
         '  - `a`: Şifre Değiştir',

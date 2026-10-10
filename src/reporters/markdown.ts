@@ -68,10 +68,11 @@ export function renderReport(input: ReportInput): string {
   }
 
   if (omitted > 0) {
-    const where = input.summaryUrl
-      ? `[job summary](${input.summaryUrl})`
-      : 'job summary'
-    body += `\n…and ${count(omitted, 'more issue', 'more issues')}, see the ${where}.\n`
+    // Without a summary link this is the job summary itself, which has nowhere else to point.
+    const rest = input.summaryUrl
+      ? `, see the [job summary](${input.summaryUrl})`
+      : ' not shown, because this page reached its size limit'
+    body += `\n…and ${count(omitted, 'more issue', 'more issues')}${rest}.\n`
   }
   return body
 }
