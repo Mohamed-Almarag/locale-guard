@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] - 2026-10-10
+
+### Fixed
+
+- The copy-paste block keeps flat keys flat. A file that writes
+  `"cart.title": "Cart"`, as react-intl expects, now gets `"cart.title": ""`
+  instead of a nested `cart` object.
+- A missing key whose namespace file does not exist yet links to the key in the
+  base file, instead of to a file that is not there.
+
 ## [1.0.1] - 2026-10-10
 
 ### Fixed
@@ -52,5 +62,6 @@ First release.
 - `fail-on`, `fail-on-existing`, `ignore-keys`, `ignore-locales`,
   `ignore-values` and `disable-checks`.
 
+[1.0.2]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.2
 [1.0.1]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.0

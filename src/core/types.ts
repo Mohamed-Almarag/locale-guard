@@ -25,6 +25,11 @@ export interface Entry extends Position {
   file: string
   /** Key inside its file. Differs from `key` when the file is a namespace. */
   fileKey: string
+  /**
+   * The key's segments as written in the file: `['cart', 'title']` for a nested
+   * key, `['cart.title']` for a flat key with a dot in its name.
+   */
+  filePath: string[]
 }
 
 /** Where an object (non-leaf) key starts, used to place annotations for missing keys. */

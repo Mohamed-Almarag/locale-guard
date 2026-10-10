@@ -46,7 +46,7 @@ export function parseJson(text: string): ParseResult {
   const entries: ParsedEntry[] = []
   const nodes: ParsedNode[] = []
 
-  const walk = (node: JsonNode, prefix: string): void => {
+  const walk = (node: JsonNode, prefix: string, path: string[]): void => {
     const children =
       node.type === 'object'
         ? (node.children ?? []).flatMap((property) => {
@@ -69,13 +69,15 @@ export function parseJson(text: string): ParseResult {
 
     for (const child of children) {
       const key = joinKey(prefix, child.key)
+      const childPath = [...path, child.key]
       const position = lines.position(child.offset)
       nodes.push({ key, ...position })
       if (child.value.type === 'object' || child.value.type === 'array') {
-        walk(child.value, key)
+        walk(child.value, key, childPath)
       } else {
         entries.push({
           key,
+          path: childPath,
           value: scalarToString(child.value.value),
           ...position
         })
@@ -83,7 +85,7 @@ export function parseJson(text: string): ParseResult {
     }
   }
 
-  walk(root, '')
+  walk(root, '', [])
   return { ok: true, entries, nodes }
 }
 

@@ -120,6 +120,24 @@ describe('i18next plural keys (plain JSON)', () => {
     )
   })
 
+  it('writes plural forms as flat keys when the base file uses flat keys', async () => {
+    const project = await load({
+      'locales/en.json': json({
+        'cart.items_one': '{{count}} item',
+        'cart.items_other': '{{count}} items'
+      }),
+      'locales/ar.json': json({ title: 'سلة التسوق' })
+    })
+    const body = renderReport({
+      issues: analyze(project, { format: 'json' }),
+      project,
+      hasBaseline: false
+    })
+    expect(body).toContain('  "cart.items_few": "",')
+    expect(body).toContain('  "cart.items_zero": ""')
+    expect(body).not.toContain('"cart": {')
+  })
+
   it('lets a form leave out the count, but not other placeholders', async () => {
     const found = await issues({
       'locales/en.json': en,

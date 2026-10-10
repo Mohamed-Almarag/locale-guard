@@ -14,7 +14,15 @@ describe('parseJson', () => {
         { key: 'auction', line: 2, column: 3 },
         { key: 'auction.bid', line: 3, column: 5 }
       ],
-      entries: [{ key: 'auction.bid', value: 'Bid', line: 3, column: 5 }]
+      entries: [
+        {
+          key: 'auction.bid',
+          path: ['auction', 'bid'],
+          value: 'Bid',
+          line: 3,
+          column: 5
+        }
+      ]
     })
   })
 
@@ -58,6 +66,14 @@ describe('parseJson', () => {
   it('rejects an empty file', () => {
     expect(parseJson('').ok).toBe(false)
   })
+
+  it('keeps a flat key with a dot in its name as one segment', () => {
+    const result = parseJson('{\n  "cart.title": "Cart"\n}')
+    expect(result.ok && result.entries[0]).toMatchObject({
+      key: 'cart.title',
+      path: ['cart.title']
+    })
+  })
 })
 
 describe('parseYaml', () => {
@@ -71,8 +87,20 @@ describe('parseYaml', () => {
         { key: 'auction.tooLow', line: 3, column: 3 }
       ],
       entries: [
-        { key: 'auction.bid', value: 'Bid', line: 2, column: 3 },
-        { key: 'auction.tooLow', value: 'Too low', line: 3, column: 3 }
+        {
+          key: 'auction.bid',
+          path: ['auction', 'bid'],
+          value: 'Bid',
+          line: 2,
+          column: 3
+        },
+        {
+          key: 'auction.tooLow',
+          path: ['auction', 'tooLow'],
+          value: 'Too low',
+          line: 3,
+          column: 3
+        }
       ]
     })
   })

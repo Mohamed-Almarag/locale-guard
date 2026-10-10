@@ -187,7 +187,7 @@ function renderGroup(
   if (group.check === 'missing-keys') {
     out += `| Key | ${input.project.baseLocale} |\n|---|---|\n`
     for (const issue of group.issues) {
-      out += `| ${linked(`\`${issue.key}\``, issue, input)} | ${cell(issue.baseValue ?? '')} |\n`
+      out += `| ${missingKeyLink(issue, input)} | ${cell(issue.baseValue ?? '')} |\n`
     }
     out += copyPaste(group.issues, input.project)
   } else {
@@ -256,9 +256,24 @@ function location(issue: Issue, input: ReportInput): string {
   return url ? `[${label}](${url})` : label
 }
 
-function linked(text: string, issue: Issue, input: ReportInput): string {
-  const url = input.link?.(issue.file, issue.line)
-  return url ? `[${text}](${url})` : text
+/**
+ * A missing key links to where it belongs in the locale file. When that file
+ * does not exist yet (a namespace file the locale never got), it links to the
+ * key in the base file instead.
+ */
+function missingKeyLink(issue: Issue, input: ReportInput): string {
+  const { project } = input
+  const label = `\`${issue.key}\``
+  const exists = project.locales
+    .get(issue.locale)
+    ?.files.some((file) => file.path === issue.file)
+  const entry = exists
+    ? undefined
+    : project.locales.get(project.baseLocale)?.entries.get(issue.key)
+  const url = entry
+    ? input.link?.(entry.file, entry.line)
+    : input.link?.(issue.file, issue.line)
+  return url ? `[${label}](${url})` : label
 }
 
 /** Ready-to-paste nested object with the missing keys and empty values, one block per file. */
@@ -279,7 +294,7 @@ function copyPasteBlock(
   const base = project.locales.get(project.baseLocale)
   const tree: Record<string, unknown> = {}
   for (const issue of issues) {
-    setPath(tree, keyInFile(base, issue.key).split('.'), '')
+    setPath(tree, pathInFile(base, issue.key), '')
   }
   const yaml = /\.ya?ml$/i.test(file)
   const code = yaml ? toYaml(tree).trimEnd() : JSON.stringify(tree, null, 2)
@@ -296,6 +311,35 @@ function keyInFile(base: Locale | undefined, key: string): string {
   if (entry) return entry.fileKey
   const namespace = base ? namespaceOf(base, key) : ''
   return namespace ? key.slice(namespace.length + 1) : key
+}
+
+/**
+ * A key's segments as the base file writes them, so a flat file
+ * (`"cart.title": ""`, as react-intl expects) gets a flat key back. A key the
+ * base lacks (an i18next plural form only Arabic needs) is shaped like the
+ * base key that shares the longest parent with it: `cart.items_few` next to
+ * `cart.items_other`.
+ */
+function pathInFile(base: Locale | undefined, key: string): string[] {
+  const entry = base?.entries.get(key)
+  if (entry) return entry.filePath
+  const inFile = keyInFile(base, key)
+  const namespace = key.slice(0, key.length - inFile.length)
+  let best: string[] | undefined
+  for (const other of base?.entries.values() ?? []) {
+    if (
+      other.key.slice(0, other.key.length - other.fileKey.length) !== namespace
+    ) {
+      continue
+    }
+    const parent = other.filePath.slice(0, -1)
+    const prefix = parent.join('.')
+    if (prefix && !inFile.startsWith(`${prefix}.`)) continue
+    if (!best || parent.length > best.length) best = parent
+  }
+  if (!best) return inFile.split('.')
+  const prefix = best.join('.')
+  return [...best, prefix ? inFile.slice(prefix.length + 1) : inFile]
 }
 
 function byFile(issues: Issue[]): Map<string, Issue[]> {
