@@ -24243,11 +24243,11 @@ function requireUtil$a () {
 	return util$a;
 }
 
-var parse$8;
+var parse$9;
 var hasRequiredParse$2;
 
 function requireParse$2 () {
-	if (hasRequiredParse$2) return parse$8;
+	if (hasRequiredParse$2) return parse$9;
 	hasRequiredParse$2 = 1;
 
 	const { maxNameValuePairSize, maxAttributeValueSize } = requireConstants$7();
@@ -24554,11 +24554,11 @@ function requireParse$2 () {
 	  return parseUnparsedAttributes(unparsedAttributes, cookieAttributeList)
 	}
 
-	parse$8 = {
+	parse$9 = {
 	  parseSetCookie,
 	  parseUnparsedAttributes
 	};
-	return parse$8;
+	return parse$9;
 }
 
 var cookies$1;
@@ -54767,11 +54767,11 @@ function requireUtil$2 () {
 	return util$2;
 }
 
-var parse$7;
+var parse$8;
 var hasRequiredParse$1;
 
 function requireParse$1 () {
-	if (hasRequiredParse$1) return parse$7;
+	if (hasRequiredParse$1) return parse$8;
 	hasRequiredParse$1 = 1;
 
 	const { maxNameValuePairSize, maxAttributeValueSize } = requireConstants$2();
@@ -55078,11 +55078,11 @@ function requireParse$1 () {
 	  return parseUnparsedAttributes(unparsedAttributes, cookieAttributeList)
 	}
 
-	parse$7 = {
+	parse$8 = {
 	  parseSetCookie,
 	  parseUnparsedAttributes
 	};
-	return parse$7;
+	return parse$8;
 }
 
 var cookies;
@@ -60274,7 +60274,7 @@ function expand$1(template, context) {
 }
 
 // pkg/dist-src/parse.js
-function parse$6(options) {
+function parse$7(options) {
   let method = options.method.toUpperCase();
   let url = (options.url || "/").replace(/:([a-z]\w+)/g, "{$1}");
   let headers = Object.assign({}, options.headers);
@@ -60340,7 +60340,7 @@ function parse$6(options) {
 
 // pkg/dist-src/endpoint-with-defaults.js
 function endpointWithDefaults$1(defaults, route, options) {
-  return parse$6(merge$3(defaults, route, options));
+  return parse$7(merge$3(defaults, route, options));
 }
 
 // pkg/dist-src/with-defaults.js
@@ -60351,7 +60351,7 @@ function withDefaults$4(oldDefaults, newDefaults) {
     DEFAULTS: DEFAULTS2,
     defaults: withDefaults$4.bind(null, DEFAULTS2),
     merge: merge$3.bind(null, DEFAULTS2),
-    parse: parse$6
+    parse: parse$7
   });
 }
 
@@ -60412,7 +60412,7 @@ const NullObject = /* @__PURE__ */ (() => {
 /**
  * Parse a `Content-Type` header.
  */
-function parse$5(header, options) {
+function parse$6(header, options) {
     const stopFlags = SEMI_FLAG | (0);
     const len = header.length;
     let valueStart = 0;
@@ -61296,7 +61296,7 @@ async function getResponseData$1(response) {
   if (!contentType) {
     return response.text().catch(noop$2);
   }
-  const mimetype = parse$5(contentType);
+  const mimetype = parse$6(contentType);
   if (isJSONResponse$1(mimetype)) {
     let text = "";
     try {
@@ -61624,7 +61624,7 @@ function expand(template, context) {
 }
 
 // pkg/dist-src/parse.js
-function parse$4(options) {
+function parse$5(options) {
   let method = options.method.toUpperCase();
   let url = (options.url || "/").replace(/:([a-z]\w+)/g, "{$1}");
   let headers = Object.assign({}, options.headers);
@@ -61690,7 +61690,7 @@ function parse$4(options) {
 
 // pkg/dist-src/endpoint-with-defaults.js
 function endpointWithDefaults(defaults, route, options) {
-  return parse$4(merge$2(defaults, route, options));
+  return parse$5(merge$2(defaults, route, options));
 }
 
 // pkg/dist-src/with-defaults.js
@@ -61701,7 +61701,7 @@ function withDefaults$2(oldDefaults, newDefaults) {
     DEFAULTS: DEFAULTS2,
     defaults: withDefaults$2.bind(null, DEFAULTS2),
     merge: merge$2.bind(null, DEFAULTS2),
-    parse: parse$4
+    parse: parse$5
   });
 }
 
@@ -61872,7 +61872,7 @@ async function getResponseData(response) {
   if (!contentType) {
     return response.text().catch(noop$1);
   }
-  const mimetype = parse$5(contentType);
+  const mimetype = parse$6(contentType);
   if (isJSONResponse(mimetype)) {
     let text = "";
     try {
@@ -69814,7 +69814,7 @@ function pruneLocation(els) {
 		else if (isTagElement(el)) pruneLocation(el.children);
 	});
 }
-function parse$3(message, opts = {}) {
+function parse$4(message, opts = {}) {
 	opts = {
 		shouldParseSkeletons: true,
 		requiresOtherClause: true,
@@ -69848,7 +69848,7 @@ function describeIcuMessage(source) {
     try {
         // `other` is required by ICU, but the plural-forms check reports it with a
         // clearer message, so the parser must not fail on it.
-        elements = parse$3(source, { requiresOtherClause: false });
+        elements = parse$4(source, { requiresOtherClause: false });
     }
     catch (error) {
         const location = error
@@ -71187,6 +71187,137 @@ function createDescriber(format) {
     };
 }
 
+/** The language part of a locale code: `ar` for `ar-EG` or `ar_EG`. */
+function languageOf(code) {
+    return code.split(/[-_]/)[0]?.toLowerCase() ?? code;
+}
+/** A locale code that Intl accepts (`pt_BR` becomes `pt-BR`), or undefined. */
+function intlLocale(code) {
+    try {
+        return Intl.getCanonicalLocales(code.replace(/_/g, '-'))[0];
+    }
+    catch {
+        return undefined;
+    }
+}
+
+/** Plural categories in the order CLDR lists them. */
+const PLURAL_CATEGORIES = ['zero', 'one', 'two', 'few', 'many', 'other'];
+const requiredCache = new Map();
+/**
+ * Categories a plural message must cover in a language: the ones that whole
+ * numbers from 0 to 1000 reach, plus `other`. This leaves out forms that only
+ * apply to millions or decimals, such as French `many`, which almost no
+ * project writes.
+ */
+function requiredCategories(locale, ordinal) {
+    const id = `${locale}|${ordinal}`;
+    const cached = requiredCache.get(id);
+    if (cached)
+        return cached;
+    const rules = new Intl.PluralRules(locale, {
+        type: ordinal ? 'ordinal' : 'cardinal'
+    });
+    const used = new Set(['other']);
+    for (let n = 0; n <= 1000; n++)
+        used.add(rules.select(n));
+    const required = PLURAL_CATEGORIES.filter((category) => used.has(category));
+    requiredCache.set(id, required);
+    return required;
+}
+function languageName(code) {
+    try {
+        return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
+    }
+    catch {
+        return code;
+    }
+}
+
+const SUFFIX = new RegExp(`^(.+?)_(ordinal_)?(${PLURAL_CATEGORIES.join('|')})$`);
+/**
+ * i18next writes each plural form as its own key: `items_one`, `items_other`,
+ * and for Arabic also `items_zero`, `items_two`, `items_few`, `items_many`.
+ * Compared key by key, a correct Arabic file has "extra" keys and a correct
+ * Japanese file (only `items_other`) has "missing" ones.
+ *
+ * A stem counts as a plural group only when the base locale has its `other`
+ * form, which i18next requires. Numbered keys like `note_one`, `note_two`,
+ * `note_three` (seen on a real project) stay plain keys.
+ */
+class SuffixPlurals {
+    groups = new Set();
+    constructor(base) {
+        for (const key of base.entries.keys()) {
+            const plural = parse$3(key);
+            if (plural?.category === 'other')
+                this.groups.add(groupId(plural));
+        }
+    }
+    /** The plural form a key stands for, if its stem is a plural group in the base. */
+    of(key) {
+        const plural = parse$3(key);
+        return plural && this.groups.has(groupId(plural)) ? plural : undefined;
+    }
+    /** The forms of a group that a locale has, by category. */
+    forms(locale, plural) {
+        const found = new Map();
+        for (const category of PLURAL_CATEGORIES) {
+            const key = keyFor(plural, category);
+            if (locale.entries.has(key))
+                found.set(category, key);
+        }
+        return found;
+    }
+    /** Every group in the base, once. */
+    stems(base) {
+        const seen = new Map();
+        for (const key of base.entries.keys()) {
+            const plural = this.of(key);
+            if (plural && !seen.has(groupId(plural))) {
+                seen.set(groupId(plural), plural);
+            }
+        }
+        return [...seen.values()];
+    }
+}
+/** The key of one form of a group: `cart.items` and `few` give `cart.items_few`. */
+function keyFor(plural, category) {
+    return `${plural.stem}_${plural.ordinal ? 'ordinal_' : ''}${category}`;
+}
+/**
+ * The base key to compare a plural form with: the same form when the base has
+ * it, otherwise its `other` form (Arabic `items_few` against English
+ * `items_other`), otherwise any form the base has.
+ */
+function baseKeyFor(base, plural) {
+    const candidates = [plural.category, 'other', ...PLURAL_CATEGORIES];
+    for (const category of candidates) {
+        const key = keyFor(plural, category);
+        if (base.entries.has(key))
+            return key;
+    }
+    return keyFor(plural, 'other');
+}
+/** The forms a locale needs, or undefined when its code is not a known locale. */
+function neededForms(code, ordinal) {
+    const locale = intlLocale(code);
+    return locale ? requiredCategories(locale, ordinal) : undefined;
+}
+function parse$3(key) {
+    const match = SUFFIX.exec(key);
+    if (!match)
+        return undefined;
+    return {
+        stem: match[1],
+        ordinal: Boolean(match[2]),
+        category: match[3]
+    };
+}
+function groupId(plural) {
+    return `${plural.stem}|${plural.ordinal}`;
+}
+
 function createContext(project, format, ignoreValues = []) {
     const base = project.locales.get(project.baseLocale);
     if (!base)
@@ -71198,8 +71329,20 @@ function createContext(project, format, ignoreValues = []) {
         base,
         targets,
         describe: createDescriber(format),
-        ignoreValues
+        ignoreValues,
+        plurals: format === 'json' ? new SuffixPlurals(base) : undefined
     };
+}
+/**
+ * The base entry a key is compared with: the same key, or for an i18next plural
+ * form the base lacks (Arabic `items_few`), the base `other` form.
+ */
+function baseEntryFor({ base, plurals }, key) {
+    const same = base.entries.get(key);
+    if (same)
+        return same;
+    const plural = plurals?.of(key);
+    return plural ? base.entries.get(baseKeyFor(base, plural)) : undefined;
 }
 /** The namespace a key belongs to in a locale: the longest file namespace that prefixes it. */
 function namespaceOf(locale, key) {
@@ -71305,12 +71448,16 @@ const emptyValues = ({ base, targets }) => {
     return issues;
 };
 
-/** F3: a key exists in a locale but not in the base locale (usually removed or misspelled). */
-const extraKeys = ({ base, targets }) => {
+/**
+ * F3: a key exists in a locale but not in the base locale (usually removed or
+ * misspelled). i18next plural forms the base lacks (Arabic `items_few`) are
+ * part of a group the base has, so they are not extra.
+ */
+const extraKeys = ({ base, targets, plurals }) => {
     const issues = [];
     for (const target of targets) {
         for (const [key, entry] of target.entries) {
-            if (base.entries.has(key))
+            if (base.entries.has(key) || plurals?.of(key))
                 continue;
             if (isBroken(base, key) || isBroken(target, key))
                 continue;
@@ -71358,35 +71505,63 @@ const invalidSyntax = ({ base, targets, describe }) => {
     return issues;
 };
 
-/** F2: a key exists in the base locale but not in another locale. */
-const missingKeys = ({ base, targets }) => {
+/**
+ * F2: a key exists in the base locale but not in another locale.
+ *
+ * An i18next plural group counts as one message: when a locale has some of its
+ * forms, the plural-forms check says which are missing. When it has none, the
+ * missing keys are the forms that locale needs (six for Arabic, one for
+ * Japanese), not the base's forms.
+ */
+const missingKeys = (context) => {
+    const { base, targets, plurals } = context;
     const issues = [];
     for (const target of targets) {
         for (const [key, entry] of base.entries) {
+            if (plurals?.of(key))
+                continue;
             if (target.entries.has(key))
                 continue;
             if (isBroken(target, key) || isBroken(base, key))
                 continue;
-            const file = expectedFile(target, base, key);
-            const anchor = target.files.some((f) => f.path === file)
-                ? anchorFor(target, key)
-                : { line: undefined, column: undefined };
-            issues.push({
-                check: 'missing-keys',
-                severity: 'error',
-                locale: target.code,
-                file,
-                key,
-                line: anchor.line,
-                column: anchor.column,
-                message: `Missing key \`${key}\``,
-                baseValue: entry.value,
-                isNew: true
-            });
+            issues.push(missing(target, base, key, entry));
+        }
+        for (const plural of plurals?.stems(base) ?? []) {
+            const anyBaseKey = baseKeyFor(base, plural);
+            if (isBroken(target, anyBaseKey) || isBroken(base, anyBaseKey))
+                continue;
+            if (plurals?.forms(target, plural).size)
+                continue;
+            const categories = neededForms(target.code, plural.ordinal) ?? [
+                ...(plurals?.forms(base, plural).keys() ?? [])
+            ];
+            for (const category of categories) {
+                const key = keyFor(plural, category);
+                const entry = baseEntryFor(context, key);
+                issues.push(missing(target, base, key, entry));
+            }
         }
     }
     return issues;
 };
+function missing(target, base, key, baseEntry) {
+    const file = expectedFile(target, base, baseEntry.key);
+    const anchor = target.files.some((f) => f.path === file)
+        ? anchorFor(target, key)
+        : { line: undefined, column: undefined };
+    return {
+        check: 'missing-keys',
+        severity: 'error',
+        locale: target.code,
+        file,
+        key,
+        line: anchor.line,
+        column: anchor.column,
+        message: `Missing key \`${key}\``,
+        baseValue: baseEntry.value,
+        isNew: true
+    };
+}
 
 /**
  * F5: the placeholders of a translation differ from the base message.
@@ -71395,20 +71570,27 @@ const missingKeys = ({ base, targets }) => {
  * vue-i18n linked messages (`@:key`) are not compared: translators often write
  * the text instead of linking, to fit the grammar of their language, and a link
  * to a wrong key is reported by broken-linked-messages.
+ *
+ * i18next plural forms are compared with the same form in the base, or its
+ * `other` form, and may leave out the count: "منتج واحد" ("one item") is a
+ * correct Arabic `_one` form.
  */
-const placeholderMismatch = ({ base, targets, describe }) => {
+const placeholderMismatch = (context) => {
+    const { targets, describe, plurals } = context;
     const issues = [];
     for (const target of targets) {
         for (const [key, entry] of target.entries) {
-            const baseEntry = base.entries.get(key);
+            const baseEntry = baseEntryFor(context, key);
             if (!baseEntry || entry.value.trim() === '')
                 continue;
             const expected = describe(baseEntry.value);
             const actual = describe(entry.value);
             if (expected.error || actual.error)
                 continue;
-            const want = expected.placeholders.filter(isComparable);
-            const have = actual.placeholders.filter(isComparable);
+            const plural = Boolean(plurals?.of(key));
+            const comparable = (p) => isComparable(p) && !(plural && COUNT.has(p));
+            const want = expected.placeholders.filter(comparable);
+            const have = actual.placeholders.filter(comparable);
             const missing = want.filter((p) => !have.includes(p));
             const unexpected = have.filter((p) => !want.includes(p));
             if (missing.length === 0 && unexpected.length === 0)
@@ -71433,6 +71615,8 @@ const placeholderMismatch = ({ base, targets, describe }) => {
     }
     return issues;
 };
+/** The count of an i18next plural, which a form may write out in words. */
+const COUNT = new Set(['{{count}}', '{count}']);
 function isComparable(placeholder) {
     return !placeholder.startsWith('@:');
 }
@@ -71440,21 +71624,6 @@ function list$1(placeholders) {
     return placeholders.map((p) => `\`${p}\``).join(', ');
 }
 
-/** The language part of a locale code: `ar` for `ar-EG` or `ar_EG`. */
-function languageOf(code) {
-    return code.split(/[-_]/)[0]?.toLowerCase() ?? code;
-}
-/** A locale code that Intl accepts (`pt_BR` becomes `pt-BR`), or undefined. */
-function intlLocale(code) {
-    try {
-        return Intl.getCanonicalLocales(code.replace(/_/g, '-'))[0];
-    }
-    catch {
-        return undefined;
-    }
-}
-
-const ORDER = ['zero', 'one', 'two', 'few', 'many', 'other'];
 /** `=0`, `=1` and `=2` cover the categories that only contain that number. */
 const EXACT = { '=0': 'zero', '=1': 'one', '=2': 'two' };
 /**
@@ -71464,11 +71633,19 @@ const EXACT = { '=0': 'zero', '=1': 'one', '=2': 'two' };
  * works without hand-written tables. A missing `other` is an error, since ICU
  * requires it.
  *
- * Only ICU is checked. vue-i18n plurals are `|` branches whose count depends
+ * Plain JSON (i18next): each form is its own key (`items_one`, `items_few`),
+ * checked against the same rules. A missing `other` is an error, since
+ * i18next falls back to it for every count without its own form.
+ *
+ * vue-i18n is not checked. Its plurals are `|` branches whose count depends
  * on custom rules, and a single branch is often correct ("{count} mois" in
  * French, "{count} ay" in Turkish), so a real project showed only false alarms.
  */
-const pluralForms = (context) => context.format === 'next-intl' ? icuPlurals(context) : [];
+const pluralForms = (context) => context.format === 'next-intl'
+    ? icuPlurals(context)
+    : context.format === 'json'
+        ? suffixPlurals(context)
+        : [];
 function icuPlurals({ base, targets, describe }) {
     const issues = [];
     for (const locale of [base, ...targets]) {
@@ -71495,34 +71672,35 @@ function icuPlurals({ base, targets, describe }) {
     }
     return issues;
 }
-/**
- * Categories a message must cover: the ones that whole numbers from 0 to 1000
- * reach, plus `other`. This leaves out forms that only apply to millions or
- * decimals, such as French `many`, which almost no project writes.
- */
-const requiredCache = new Map();
-function requiredCategories(locale, ordinal) {
-    const id = `${locale}|${ordinal}`;
-    const cached = requiredCache.get(id);
-    if (cached)
-        return cached;
-    const rules = new Intl.PluralRules(locale, {
-        type: ordinal ? 'ordinal' : 'cardinal'
-    });
-    const used = new Set(['other']);
-    for (let n = 0; n <= 1000; n++)
-        used.add(rules.select(n));
-    const required = ORDER.filter((category) => used.has(category));
-    requiredCache.set(id, required);
-    return required;
-}
-function languageName(code) {
-    try {
-        return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
+/** i18next plural groups: one issue per group and locale that misses forms. */
+function suffixPlurals({ base, targets, plurals }) {
+    if (!plurals)
+        return [];
+    const issues = [];
+    for (const locale of [base, ...targets]) {
+        const code = intlLocale(locale.code);
+        for (const plural of plurals.stems(base)) {
+            const forms = plurals.forms(locale, plural);
+            // A group with no form at all is reported by missing-keys.
+            const needed = neededForms(locale.code, plural.ordinal);
+            if (forms.size === 0 || !code || !needed)
+                continue;
+            const missing = needed.filter((category) => !forms.has(category));
+            if (missing.length === 0)
+                continue;
+            const entry = locale.entries.get([...forms.values()][0]);
+            if (!entry)
+                continue;
+            issues.push(issue$1(locale, plural.stem, entry, {
+                severity: missing.includes('other') ? 'error' : 'warning',
+                message: `\`${plural.stem}\`: ${languageName(code)} uses ${needed.join(', ')}. Missing: ${missing.map((category) => `\`${keyFor(plural, category)}\``).join(', ')}`,
+                baseValue: locale === base
+                    ? undefined
+                    : base.entries.get(keyFor(plural, 'other'))?.value
+            }));
+        }
     }
-    catch {
-        return code;
-    }
+    return issues;
 }
 function issue$1(locale, key, entry, details) {
     return {
@@ -71610,7 +71788,8 @@ const untranslated = (context) => [
     ...perValue(context),
     ...sharedValues(context)
 ];
-const perValue = ({ base, targets, describe, ignoreValues }) => {
+const perValue = (context) => {
+    const { base, targets, describe, ignoreValues } = context;
     const ignored = ignoredSet(ignoreValues);
     const baseLanguage = languageOf(base.code);
     const issues = [];
@@ -71618,7 +71797,7 @@ const perValue = ({ base, targets, describe, ignoreValues }) => {
         const language = languageOf(target.code);
         const script = SCRIPTS[language];
         for (const [key, entry] of target.entries) {
-            const baseEntry = base.entries.get(key);
+            const baseEntry = baseEntryFor(context, key);
             const value = entry.value.trim();
             if (!baseEntry || !value || ignored.has(value.toLowerCase()))
                 continue;
@@ -86975,12 +87154,23 @@ function copyPasteBlock(summary, file, issues, project) {
     const base = project.locales.get(project.baseLocale);
     const tree = {};
     for (const issue of issues) {
-        const fileKey = base?.entries.get(issue.key)?.fileKey ?? issue.key;
-        setPath(tree, fileKey.split('.'), '');
+        setPath(tree, keyInFile(base, issue.key).split('.'), '');
     }
     const yaml = /\.ya?ml$/i.test(file);
     const code = yaml ? stringify(tree).trimEnd() : JSON.stringify(tree, null, 2);
     return `\n<details><summary>📋 ${summary}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`;
+}
+/**
+ * A key as written inside its file, without the file's namespace. Keys the base
+ * lacks (an i18next plural form only Arabic needs) take the namespace off the
+ * same way.
+ */
+function keyInFile(base, key) {
+    const entry = base?.entries.get(key);
+    if (entry)
+        return entry.fileKey;
+    const namespace = base ? namespaceOf(base, key) : '';
+    return namespace ? key.slice(namespace.length + 1) : key;
 }
 function byFile(issues) {
     const files = new Map();

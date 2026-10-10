@@ -1,6 +1,6 @@
 import { languageOf } from '../locale-code.js'
 import type { Entry, Issue, Locale } from '../types.js'
-import type { Check, CheckContext } from './context.js'
+import { type Check, type CheckContext, baseEntryFor } from './context.js'
 
 /** Languages written in a script other than Latin, with the letters of that script. */
 const SCRIPTS: Record<string, { name: string; letters: RegExp }> = {
@@ -80,7 +80,8 @@ export const untranslated: Check = (context) => [
   ...sharedValues(context)
 ]
 
-const perValue: Check = ({ base, targets, describe, ignoreValues }) => {
+const perValue: Check = (context) => {
+  const { base, targets, describe, ignoreValues } = context
   const ignored = ignoredSet(ignoreValues)
   const baseLanguage = languageOf(base.code)
   const issues: Issue[] = []
@@ -90,7 +91,7 @@ const perValue: Check = ({ base, targets, describe, ignoreValues }) => {
     const script = SCRIPTS[language]
 
     for (const [key, entry] of target.entries) {
-      const baseEntry = base.entries.get(key)
+      const baseEntry = baseEntryFor(context, key)
       const value = entry.value.trim()
       if (!baseEntry || !value || ignored.has(value.toLowerCase())) continue
 

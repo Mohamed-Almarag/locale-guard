@@ -1,5 +1,13 @@
 import { type MessageInfo, createDescriber } from '../formats/index.js'
-import type { Format, Issue, Locale, Position, Project } from '../types.js'
+import type {
+  Entry,
+  Format,
+  Issue,
+  Locale,
+  Position,
+  Project
+} from '../types.js'
+import { SuffixPlurals, baseKeyFor } from './suffix-plurals.js'
 
 export interface CheckContext {
   project: Project
@@ -11,6 +19,8 @@ export interface CheckContext {
   describe: (source: string) => MessageInfo
   /** Values that may stay identical to the base or in another script (brand names). */
   ignoreValues: string[]
+  /** i18next plural keys (`items_one`, `items_other`), for plain JSON projects. */
+  plurals?: SuffixPlurals
 }
 
 export type Check = (context: CheckContext) => Issue[]
@@ -31,8 +41,23 @@ export function createContext(
     base,
     targets,
     describe: createDescriber(format),
-    ignoreValues
+    ignoreValues,
+    plurals: format === 'json' ? new SuffixPlurals(base) : undefined
   }
+}
+
+/**
+ * The base entry a key is compared with: the same key, or for an i18next plural
+ * form the base lacks (Arabic `items_few`), the base `other` form.
+ */
+export function baseEntryFor(
+  { base, plurals }: CheckContext,
+  key: string
+): Entry | undefined {
+  const same = base.entries.get(key)
+  if (same) return same
+  const plural = plurals?.of(key)
+  return plural ? base.entries.get(baseKeyFor(base, plural)) : undefined
 }
 
 /** The namespace a key belongs to in a locale: the longest file namespace that prefixes it. */

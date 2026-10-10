@@ -1,5 +1,6 @@
 import { stringify as toYaml } from 'yaml'
-import type { CheckId, Issue, Project } from '../core/types.js'
+import { namespaceOf } from '../core/checks/context.js'
+import type { CheckId, Issue, Locale, Project } from '../core/types.js'
 
 /** Hidden marker that identifies the Locale Guard comment on a pull request. */
 export const MARKER = '<!-- locale-guard -->'
@@ -278,12 +279,23 @@ function copyPasteBlock(
   const base = project.locales.get(project.baseLocale)
   const tree: Record<string, unknown> = {}
   for (const issue of issues) {
-    const fileKey = base?.entries.get(issue.key)?.fileKey ?? issue.key
-    setPath(tree, fileKey.split('.'), '')
+    setPath(tree, keyInFile(base, issue.key).split('.'), '')
   }
   const yaml = /\.ya?ml$/i.test(file)
   const code = yaml ? toYaml(tree).trimEnd() : JSON.stringify(tree, null, 2)
   return `\n<details><summary>📋 ${summary}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`
+}
+
+/**
+ * A key as written inside its file, without the file's namespace. Keys the base
+ * lacks (an i18next plural form only Arabic needs) take the namespace off the
+ * same way.
+ */
+function keyInFile(base: Locale | undefined, key: string): string {
+  const entry = base?.entries.get(key)
+  if (entry) return entry.fileKey
+  const namespace = base ? namespaceOf(base, key) : ''
+  return namespace ? key.slice(namespace.length + 1) : key
 }
 
 function byFile(issues: Issue[]): Map<string, Issue[]> {
