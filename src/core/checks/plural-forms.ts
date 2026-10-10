@@ -1,6 +1,7 @@
 import type { PluralInfo } from '../formats/index.js'
 import type { Issue, Locale } from '../types.js'
-import { type Check, type CheckContext, intlLocale } from './context.js'
+import { intlLocale } from '../locale-code.js'
+import type { Check, CheckContext } from './context.js'
 
 const ORDER = ['zero', 'one', 'two', 'few', 'many', 'other']
 

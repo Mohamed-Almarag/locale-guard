@@ -35,6 +35,26 @@ describe('F7 untranslated', () => {
     ])
   })
 
+  it('leaves single identical words to the script rule, since most are brands or cognates', async () => {
+    const issues = await run('untranslated', {
+      'locales/en.json': json({
+        a: 'Total',
+        b: 'Chat',
+        c: 'Notifications enabled'
+      }),
+      'locales/es.json': json({
+        a: 'Total',
+        b: 'Chat',
+        c: 'Notifications enabled'
+      }),
+      'locales/ar.json': json({ a: 'المجموع', b: 'Chat', c: 'تم التفعيل' })
+    })
+    expect(summarize(issues)).toEqual([
+      'ar b:3 `b`: no Arabic letters, looks untranslated',
+      'es c:4 `c`: same text as en'
+    ])
+  })
+
   it('does not compare variants of the same language', async () => {
     const issues = await run(
       'untranslated',
@@ -73,13 +93,16 @@ describe('F7 untranslated', () => {
   it('skips values listed in ignore-values, case-insensitively', async () => {
     const project = await load({
       'locales/en.json': json({ a: 'Google', b: 'OK', c: 'Email' }),
-      'locales/ar.json': json({ a: 'Google', b: 'ok', c: 'Email' })
+      'locales/ar.json': json({ a: 'Google', b: 'ok', c: 'Email' }),
+      'locales/fr.json': json({ a: 'Google', b: 'OK', c: 'Email' })
     })
     const issues = analyze(project, {
       format: 'json',
       ignoreValues: ['google', 'OK']
     }).filter((i) => i.check === 'untranslated')
-    expect(summarize(issues)).toEqual(['ar c:4 `c`: same text as en'])
+    expect(summarize(issues)).toEqual([
+      'ar c:4 `c`: no Arabic letters, looks untranslated'
+    ])
   })
 
   it('skips messages that cannot be parsed', async () => {

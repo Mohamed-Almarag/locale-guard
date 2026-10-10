@@ -105,6 +105,11 @@ async function check(
     localFileSource(workspace),
     loadOptions(config)
   )
+  if (project.skipped.length > 0) {
+    core.info(
+      `Skipped files whose name is not a locale code: ${project.skipped.join(', ')}. Narrow "files" if one of them is a real locale.`
+    )
+  }
 
   if (!project.locales.has(baseLocale)) {
     const found = [...project.locales.keys()]

@@ -53,6 +53,8 @@ export interface Project {
   locales: Map<string, Locale>
   /** Files that could not be parsed. Their locale is loaded without them. */
   parseErrors: Issue[]
+  /** Files that match a pattern but whose {locale} part is not a locale code. */
+  skipped: string[]
 }
 
 export interface Issue {

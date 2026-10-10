@@ -1,5 +1,6 @@
 import type { Issue } from '../types.js'
-import { type Check, languageOf } from './context.js'
+import { languageOf } from '../locale-code.js'
+import type { Check } from './context.js'
 
 /** Languages written in a script other than Latin, with the letters of that script. */
 const SCRIPTS: Record<string, { name: string; letters: RegExp }> = {
@@ -34,12 +35,17 @@ const SCRIPTS: Record<string, { name: string; letters: RegExp }> = {
 
 const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
 const LETTER = /\p{L}/u
+const WORD = /\p{L}+/gu
 
 /**
  * F7: text that was probably never translated.
- *  - identical to the base value (skipped between variants of one language, e.g. en and en-GB)
+ *  - identical to the base value, with at least two words (skipped between
+ *    variants of one language, e.g. en and en-GB)
  *  - for non-Latin languages, no letter of that language's script at all
- * Brand names and words like "OK" belong in `ignore-values`.
+ *
+ * Single words are left out of the identical rule: on a real project most of
+ * them were brands or words that are the same in both languages ("Total",
+ * "Chat", "Premium"). Brand names in non-Latin locales belong in `ignore-values`.
  */
 export const untranslated: Check = ({
   base,
@@ -68,7 +74,11 @@ export const untranslated: Check = ({
       if (!LETTER.test(text)) continue
 
       let message: string | undefined
-      if (language !== baseLanguage && value === baseEntry.value.trim()) {
+      if (
+        language !== baseLanguage &&
+        value === baseEntry.value.trim() &&
+        (text.match(WORD)?.length ?? 0) >= 2
+      ) {
         message = `\`${key}\`: same text as ${base.code}`
       } else if (script && !script.letters.test(text)) {
         message = `\`${key}\`: no ${script.name} letters, looks untranslated`

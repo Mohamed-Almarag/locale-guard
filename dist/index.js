@@ -71206,20 +71206,6 @@ function createContext(project, format, ignoreValues = []) {
         ignoreValues
     };
 }
-/** The language part of a locale code: `ar` for `ar-EG` or `ar_EG`. */
-function languageOf(code) {
-    return code.split(/[-_]/)[0]?.toLowerCase() ?? code;
-}
-/** A locale code that Intl accepts (`pt_BR` becomes `pt-BR`), or undefined. */
-function intlLocale(code) {
-    const normalized = code.replace(/_/g, '-');
-    try {
-        return Intl.getCanonicalLocales(normalized)[0];
-    }
-    catch {
-        return undefined;
-    }
-}
 /** The namespace a key belongs to in a locale: the longest file namespace that prefixes it. */
 function namespaceOf(locale, key) {
     let best = '';
@@ -71459,6 +71445,20 @@ function list$1(placeholders) {
     return placeholders.map((p) => `\`${p}\``).join(', ');
 }
 
+/** The language part of a locale code: `ar` for `ar-EG` or `ar_EG`. */
+function languageOf(code) {
+    return code.split(/[-_]/)[0]?.toLowerCase() ?? code;
+}
+/** A locale code that Intl accepts (`pt_BR` becomes `pt-BR`), or undefined. */
+function intlLocale(code) {
+    try {
+        return Intl.getCanonicalLocales(code.replace(/_/g, '-'))[0];
+    }
+    catch {
+        return undefined;
+    }
+}
+
 const ORDER = ['zero', 'one', 'two', 'few', 'many', 'other'];
 /** `=0`, `=1` and `=2` cover the categories that only contain that number. */
 const EXACT = { '=0': 'zero', '=1': 'one', '=2': 'two' };
@@ -71605,11 +71605,16 @@ const SCRIPTS = {
 };
 const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g;
 const LETTER = /\p{L}/u;
+const WORD = /\p{L}+/gu;
 /**
  * F7: text that was probably never translated.
- *  - identical to the base value (skipped between variants of one language, e.g. en and en-GB)
+ *  - identical to the base value, with at least two words (skipped between
+ *    variants of one language, e.g. en and en-GB)
  *  - for non-Latin languages, no letter of that language's script at all
- * Brand names and words like "OK" belong in `ignore-values`.
+ *
+ * Single words are left out of the identical rule: on a real project most of
+ * them were brands or words that are the same in both languages ("Total",
+ * "Chat", "Premium"). Brand names in non-Latin locales belong in `ignore-values`.
  */
 const untranslated = ({ base, targets, describe, ignoreValues }) => {
     const ignored = new Set(ignoreValues.map((value) => value.trim().toLowerCase()));
@@ -71630,7 +71635,9 @@ const untranslated = ({ base, targets, describe, ignoreValues }) => {
             if (!LETTER.test(text))
                 continue;
             let message;
-            if (language !== baseLanguage && value === baseEntry.value.trim()) {
+            if (language !== baseLanguage &&
+                value === baseEntry.value.trim() &&
+                (text.match(WORD)?.length ?? 0) >= 2) {
                 message = `\`${key}\`: same text as ${base.code}`;
             }
             else if (script && !script.letters.test(text)) {
@@ -86553,12 +86560,18 @@ function listFileSource(paths, read) {
 async function loadProject(source, options) {
     const ignored = new Set(options.ignoreLocales ?? []);
     const found = new Map();
+    const skipped = [];
     for (const pattern of options.patterns) {
         const paths = await source.glob([toGlob(pattern)]);
         for (const path of paths.sort()) {
             const match = matchPattern(pattern, path);
             if (!match || ignored.has(match.locale))
                 continue;
+            // e.g. locales/vee-validate-ur.json next to the real locale files.
+            if (!intlLocale(match.locale)) {
+                skipped.push(path);
+                continue;
+            }
             const files = found.get(match.locale) ?? [];
             if (!files.some((file) => file.path === path)) {
                 files.push({ path, namespace: match.namespace });
@@ -86625,7 +86638,8 @@ async function loadProject(source, options) {
     return {
         baseLocale: options.baseLocale,
         locales: new Map([...locales].sort(([a], [b]) => a.localeCompare(b))),
-        parseErrors
+        parseErrors,
+        skipped
     };
 }
 function parse(path, raw) {
@@ -87076,6 +87090,9 @@ async function check(config, workspace, configPath) {
     }
     const baseLocale = config['base-locale'];
     const project = await loadProject(localFileSource(workspace), loadOptions(config));
+    if (project.skipped.length > 0) {
+        info(`Skipped files whose name is not a locale code: ${project.skipped.join(', ')}. Narrow "files" if one of them is a real locale.`);
+    }
     if (!project.locales.has(baseLocale)) {
         const found = [...project.locales.keys()];
         setFailed(found.length

@@ -152,6 +152,16 @@ describe('loadProject', () => {
     expect(en?.brokenNamespaces).toEqual(new Set(['checkout']))
   })
 
+  it('skips files whose locale part is not a locale code', async () => {
+    const project = await load({
+      'locales/en.json': json({ a: 'A' }),
+      'locales/ur.json': json({ a: 'ا' }),
+      'locales/vee-validate-ur.json': json({ messages: { required: 'x' } })
+    })
+    expect([...project.locales.keys()]).toEqual(['en', 'ur'])
+    expect(project.skipped).toEqual(['locales/vee-validate-ur.json'])
+  })
+
   it('ignores a byte order mark', async () => {
     const project = await load({ 'locales/en.json': '﻿{"a": "A"}' })
     expect(project.parseErrors).toEqual([])

@@ -94,7 +94,7 @@ describe('vue-project fixture: untranslated and plurals', () => {
       POLISH_CHECKS
     )
     expect(summarize(issues)).toEqual([
-      'ar common.ok:5 `common.ok`: same text as en',
+      'ar common.ok:5 `common.ok`: no Arabic letters, looks untranslated',
       'ar cart.items:15 `cart.items`: en has 3 plural forms separated by `|`, ar has 1',
       'fr auction.bid.tooLow:10 `auction.bid.tooLow`: same text as en'
     ])
@@ -110,7 +110,7 @@ describe('next-project fixture: untranslated and plurals', () => {
       POLISH_CHECKS
     )
     expect(summarize(issues)).toEqual([
-      'ar Checkout.total:3 `Checkout.total`: same text as en',
+      'ar Checkout.total:3 `Checkout.total`: no Arabic letters, looks untranslated',
       'ar Cart.items:6 `Cart.items`: Arabic uses zero, one, two, few, many, other. Missing: zero, two, few, many'
     ])
   })
