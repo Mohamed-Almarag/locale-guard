@@ -192,6 +192,10 @@ function renderGroup(
     for (const issue of group.issues) {
       const where = location(issue, input)
       out += `- ${issue.message}${where ? ` · ${where}` : ''}\n`
+      if (issue.details?.length) {
+        const lines = issue.details.map((line) => `  - ${cell(line)}`)
+        out += `  <details><summary>${count(issue.details.length, 'key', 'keys')}</summary>\n\n${lines.join('\n')}\n\n  </details>\n`
+      }
     }
   }
   return out

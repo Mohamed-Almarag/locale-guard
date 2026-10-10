@@ -1,6 +1,6 @@
-import type { Issue } from '../types.js'
 import { languageOf } from '../locale-code.js'
-import type { Check } from './context.js'
+import type { Entry, Issue, Locale } from '../types.js'
+import type { Check, CheckContext } from './context.js'
 
 /** Languages written in a script other than Latin, with the letters of that script. */
 const SCRIPTS: Record<string, { name: string; letters: RegExp }> = {
@@ -38,24 +38,45 @@ const LETTER = /\p{L}/u
 const WORD = /\p{L}+/gu
 
 /**
+ * Languages close enough that whole sentences are often written the same way
+ * ("Generar Factura" in Spanish and Catalan). Values shared inside a group are
+ * not reported by the cross-locale rule.
+ */
+const RELATED_LANGUAGES = [
+  ['no', 'nb', 'nn', 'da'],
+  ['es', 'ca', 'gl', 'pt', 'ast'],
+  ['tr', 'az'],
+  ['sr', 'hr', 'bs', 'sh', 'cnr'],
+  ['cs', 'sk'],
+  ['ms', 'id'],
+  ['bg', 'mk'],
+  ['ro', 'mo'],
+  ['fa', 'prs'],
+  ['nl', 'af']
+]
+
+/** A pair of locales must share at least this many values to be reported. */
+const MIN_SHARED_VALUES = 2
+
+/**
  * F7: text that was probably never translated.
  *  - identical to the base value, with at least two words (skipped between
  *    variants of one language, e.g. en and en-GB)
  *  - for non-Latin languages, no letter of that language's script at all
+ *  - identical in two other locales, e.g. Turkish text pasted into the
+ *    French file (see `sharedValues`)
  *
- * Single words are left out of the identical rule: on a real project most of
+ * Single words are left out of the identical rules: on a real project most of
  * them were brands or words that are the same in both languages ("Total",
  * "Chat", "Premium"). Brand names in non-Latin locales belong in `ignore-values`.
  */
-export const untranslated: Check = ({
-  base,
-  targets,
-  describe,
-  ignoreValues
-}) => {
-  const ignored = new Set(
-    ignoreValues.map((value) => value.trim().toLowerCase())
-  )
+export const untranslated: Check = (context) => [
+  ...perValue(context),
+  ...sharedValues(context)
+]
+
+const perValue: Check = ({ base, targets, describe, ignoreValues }) => {
+  const ignored = ignoredSet(ignoreValues)
   const baseLanguage = languageOf(base.code)
   const issues: Issue[] = []
 
@@ -68,16 +89,14 @@ export const untranslated: Check = ({
       const value = entry.value.trim()
       if (!baseEntry || !value || ignored.has(value.toLowerCase())) continue
 
-      const info = describe(entry.value)
-      if (info.error) continue
-      const text = info.text.replace(URL_OR_EMAIL, ' ')
-      if (!LETTER.test(text)) continue
+      const text = visibleText(describe, entry.value)
+      if (text === undefined || !LETTER.test(text)) continue
 
       let message: string | undefined
       if (
         language !== baseLanguage &&
         value === baseEntry.value.trim() &&
-        (text.match(WORD)?.length ?? 0) >= 2
+        wordCount(text) >= 2
       ) {
         message = `\`${key}\`: same text as ${base.code}`
       } else if (script && !script.letters.test(text)) {
@@ -101,4 +120,85 @@ export const untranslated: Check = ({
   }
 
   return issues
+}
+
+/**
+ * Two locales of unrelated languages that hold the same text for the same keys,
+ * while the base says something else: one file was copied into the other. A
+ * real project had 22 Turkish values in its French file.
+ *
+ * One issue per pair of locales, with the keys as details, because it is one
+ * mistake. It is attached to the first locale of the pair by name, since the
+ * tool cannot tell which file is the wrong one.
+ */
+const sharedValues: Check = ({ base, targets, describe, ignoreValues }) => {
+  const ignored = ignoredSet(ignoreValues)
+  const issues: Issue[] = []
+  const sorted = [...targets].sort((a, b) => a.code.localeCompare(b.code))
+
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length; j++) {
+      const first = sorted[i] as Locale
+      const second = sorted[j] as Locale
+      if (related(first.code, second.code)) continue
+
+      const shared: string[] = []
+      for (const [key, entry] of first.entries) {
+        const value = entry.value.trim()
+        const baseValue = base.entries.get(key)?.value.trim()
+        if (!value || baseValue === undefined || value === baseValue) continue
+        if (second.entries.get(key)?.value.trim() !== value) continue
+        if (ignored.has(value.toLowerCase())) continue
+        const text = visibleText(describe, entry.value)
+        if (text !== undefined && wordCount(text) >= 2) shared.push(key)
+      }
+      if (shared.length < MIN_SHARED_VALUES) continue
+
+      const entry = first.entries.get(shared[0] as string) as Entry
+      issues.push({
+        check: 'untranslated',
+        severity: 'warning',
+        locale: first.code,
+        file: entry.file,
+        key: shared[0] as string,
+        line: entry.line,
+        column: entry.column,
+        message: `${first.code} and ${second.code} have ${shared.length} identical values, so one file was probably copied into the other`,
+        details: shared.map(
+          (key) => `\`${key}\`: ${first.entries.get(key)?.value.trim()}`
+        ),
+        isNew: true
+      })
+    }
+  }
+
+  return issues
+}
+
+function related(a: string, b: string): boolean {
+  const first = languageOf(a)
+  const second = languageOf(b)
+  return (
+    first === second ||
+    RELATED_LANGUAGES.some(
+      (group) => group.includes(first) && group.includes(second)
+    )
+  )
+}
+
+/** The text a user reads, without placeholders, URLs or emails; undefined if the message is broken. */
+function visibleText(
+  describe: CheckContext['describe'],
+  value: string
+): string | undefined {
+  const info = describe(value)
+  return info.error ? undefined : info.text.replace(URL_OR_EMAIL, ' ')
+}
+
+function wordCount(text: string): number {
+  return text.match(WORD)?.length ?? 0
+}
+
+function ignoredSet(values: string[]): Set<string> {
+  return new Set(values.map((value) => value.trim().toLowerCase()))
 }

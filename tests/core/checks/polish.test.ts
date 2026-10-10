@@ -118,6 +118,105 @@ describe('F7 untranslated', () => {
   })
 })
 
+describe('F7 untranslated: values shared by two locales', () => {
+  const en = json({
+    title: 'Change password',
+    done: 'Password changed',
+    save: 'Save changes',
+    drive: 'Google Drive'
+  })
+
+  it('reports Turkish text copied into the French file, once for the pair', async () => {
+    const turkish = { title: 'Şifre Değiştir', done: 'Şifre Değiştirildi' }
+    const issues = await run('untranslated', {
+      'locales/en.json': en,
+      'locales/fr.json': json({
+        ...turkish,
+        save: 'Enregistrer les modifications'
+      }),
+      'locales/tr.json': json({ ...turkish, save: 'Değişiklikleri kaydet' })
+    })
+    expect(issues).toEqual([
+      {
+        check: 'untranslated',
+        severity: 'warning',
+        locale: 'fr',
+        file: 'locales/fr.json',
+        key: 'title',
+        line: 2,
+        column: 3,
+        message:
+          'fr and tr have 2 identical values, so one file was probably copied into the other',
+        details: ['`title`: Şifre Değiştir', '`done`: Şifre Değiştirildi'],
+        isNew: true
+      }
+    ])
+  })
+
+  it('needs at least two shared values, so one brand name is not reported', async () => {
+    const issues = await run('untranslated', {
+      'locales/en.json': json({ drive: 'Cloud storage', save: 'Save changes' }),
+      'locales/es.json': json({
+        drive: 'Google Drive',
+        save: 'Guardar cambios'
+      }),
+      'locales/fr.json': json({ drive: 'Google Drive', save: 'Enregistrer' })
+    })
+    expect(issues).toEqual([])
+  })
+
+  it('does not compare related languages, which often share whole sentences', async () => {
+    const shared = { title: 'Generar factura', done: 'Factura generada' }
+    const issues = await run('untranslated', {
+      'locales/en.json': en,
+      'locales/es.json': json(shared),
+      'locales/ca.json': json(shared),
+      'locales/nb-NO.json': json({
+        title: 'Generer faktura',
+        done: 'Faktura laget'
+      }),
+      'locales/nn-NO.json': json({
+        title: 'Generer faktura',
+        done: 'Faktura laget'
+      })
+    })
+    expect(issues).toEqual([])
+  })
+
+  it('leaves values equal to the base to the base rule', async () => {
+    const issues = await run('untranslated', {
+      'locales/en.json': en,
+      'locales/de.json': json({
+        title: 'Change password',
+        done: 'Password changed'
+      }),
+      'locales/fr.json': json({
+        title: 'Change password',
+        done: 'Password changed'
+      })
+    })
+    expect(issues.map((issue) => issue.message)).toEqual([
+      '`title`: same text as en',
+      '`done`: same text as en',
+      '`title`: same text as en',
+      '`done`: same text as en'
+    ])
+  })
+
+  it('skips values in ignore-values', async () => {
+    const project = await load({
+      'locales/en.json': en,
+      'locales/fr.json': json({ title: 'Acme Cloud', done: 'Acme Drive' }),
+      'locales/tr.json': json({ title: 'Acme Cloud', done: 'Acme Drive' })
+    })
+    const issues = analyze(project, {
+      format: 'json',
+      ignoreValues: ['Acme Cloud']
+    }).filter((issue) => issue.check === 'untranslated')
+    expect(issues).toEqual([])
+  })
+})
+
 describe('F8 plural-forms: ICU', () => {
   it('passes when every form the language needs is there', async () => {
     const issues = await run(

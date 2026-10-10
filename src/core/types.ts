@@ -67,5 +67,7 @@ export interface Issue {
   column?: number
   message: string
   baseValue?: string
+  /** Extra lines shown collapsed under the issue, e.g. every key of a grouped issue. */
+  details?: string[]
   isNew: boolean
 }

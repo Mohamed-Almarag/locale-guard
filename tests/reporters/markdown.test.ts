@@ -200,6 +200,25 @@ describe('renderReport', () => {
     )
   })
 
+  it('lists the keys of a grouped issue in a collapsed block', async () => {
+    const body = await report({
+      'locales/en.json': json({ a: 'Change password', b: 'Password changed' }),
+      'locales/fr.json': json({ a: 'Şifre Değiştir', b: 'Şifre Değiştirildi' }),
+      'locales/tr.json': json({ a: 'Şifre Değiştir', b: 'Şifre Değiştirildi' })
+    })
+    expect(body).toContain(
+      [
+        '- fr and tr have 2 identical values, so one file was probably copied into the other · [fr.json:2](https://x/locales/fr.json#L2)',
+        '  <details><summary>2 keys</summary>',
+        '',
+        '  - `a`: Şifre Değiştir',
+        '  - `b`: Şifre Değiştirildi',
+        '',
+        '  </details>'
+      ].join('\n')
+    )
+  })
+
   it('escapes table cells', async () => {
     const body = await report({
       'locales/en.json': json({ a: 'A | B\nC' }),

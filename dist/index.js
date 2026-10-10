@@ -71571,17 +71571,42 @@ const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g;
 const LETTER = /\p{L}/u;
 const WORD = /\p{L}+/gu;
 /**
+ * Languages close enough that whole sentences are often written the same way
+ * ("Generar Factura" in Spanish and Catalan). Values shared inside a group are
+ * not reported by the cross-locale rule.
+ */
+const RELATED_LANGUAGES = [
+    ['no', 'nb', 'nn', 'da'],
+    ['es', 'ca', 'gl', 'pt', 'ast'],
+    ['tr', 'az'],
+    ['sr', 'hr', 'bs', 'sh', 'cnr'],
+    ['cs', 'sk'],
+    ['ms', 'id'],
+    ['bg', 'mk'],
+    ['ro', 'mo'],
+    ['fa', 'prs'],
+    ['nl', 'af']
+];
+/** A pair of locales must share at least this many values to be reported. */
+const MIN_SHARED_VALUES = 2;
+/**
  * F7: text that was probably never translated.
  *  - identical to the base value, with at least two words (skipped between
  *    variants of one language, e.g. en and en-GB)
  *  - for non-Latin languages, no letter of that language's script at all
+ *  - identical in two other locales, e.g. Turkish text pasted into the
+ *    French file (see `sharedValues`)
  *
- * Single words are left out of the identical rule: on a real project most of
+ * Single words are left out of the identical rules: on a real project most of
  * them were brands or words that are the same in both languages ("Total",
  * "Chat", "Premium"). Brand names in non-Latin locales belong in `ignore-values`.
  */
-const untranslated = ({ base, targets, describe, ignoreValues }) => {
-    const ignored = new Set(ignoreValues.map((value) => value.trim().toLowerCase()));
+const untranslated = (context) => [
+    ...perValue(context),
+    ...sharedValues(context)
+];
+const perValue = ({ base, targets, describe, ignoreValues }) => {
+    const ignored = ignoredSet(ignoreValues);
     const baseLanguage = languageOf(base.code);
     const issues = [];
     for (const target of targets) {
@@ -71592,16 +71617,13 @@ const untranslated = ({ base, targets, describe, ignoreValues }) => {
             const value = entry.value.trim();
             if (!baseEntry || !value || ignored.has(value.toLowerCase()))
                 continue;
-            const info = describe(entry.value);
-            if (info.error)
-                continue;
-            const text = info.text.replace(URL_OR_EMAIL, ' ');
-            if (!LETTER.test(text))
+            const text = visibleText(describe, entry.value);
+            if (text === undefined || !LETTER.test(text))
                 continue;
             let message;
             if (language !== baseLanguage &&
                 value === baseEntry.value.trim() &&
-                (text.match(WORD)?.length ?? 0) >= 2) {
+                wordCount(text) >= 2) {
                 message = `\`${key}\`: same text as ${base.code}`;
             }
             else if (script && !script.letters.test(text)) {
@@ -71625,6 +71647,75 @@ const untranslated = ({ base, targets, describe, ignoreValues }) => {
     }
     return issues;
 };
+/**
+ * Two locales of unrelated languages that hold the same text for the same keys,
+ * while the base says something else: one file was copied into the other. A
+ * real project had 22 Turkish values in its French file.
+ *
+ * One issue per pair of locales, with the keys as details, because it is one
+ * mistake. It is attached to the first locale of the pair by name, since the
+ * tool cannot tell which file is the wrong one.
+ */
+const sharedValues = ({ base, targets, describe, ignoreValues }) => {
+    const ignored = ignoredSet(ignoreValues);
+    const issues = [];
+    const sorted = [...targets].sort((a, b) => a.code.localeCompare(b.code));
+    for (let i = 0; i < sorted.length; i++) {
+        for (let j = i + 1; j < sorted.length; j++) {
+            const first = sorted[i];
+            const second = sorted[j];
+            if (related(first.code, second.code))
+                continue;
+            const shared = [];
+            for (const [key, entry] of first.entries) {
+                const value = entry.value.trim();
+                const baseValue = base.entries.get(key)?.value.trim();
+                if (!value || baseValue === undefined || value === baseValue)
+                    continue;
+                if (second.entries.get(key)?.value.trim() !== value)
+                    continue;
+                if (ignored.has(value.toLowerCase()))
+                    continue;
+                const text = visibleText(describe, entry.value);
+                if (text !== undefined && wordCount(text) >= 2)
+                    shared.push(key);
+            }
+            if (shared.length < MIN_SHARED_VALUES)
+                continue;
+            const entry = first.entries.get(shared[0]);
+            issues.push({
+                check: 'untranslated',
+                severity: 'warning',
+                locale: first.code,
+                file: entry.file,
+                key: shared[0],
+                line: entry.line,
+                column: entry.column,
+                message: `${first.code} and ${second.code} have ${shared.length} identical values, so one file was probably copied into the other`,
+                details: shared.map((key) => `\`${key}\`: ${first.entries.get(key)?.value.trim()}`),
+                isNew: true
+            });
+        }
+    }
+    return issues;
+};
+function related(a, b) {
+    const first = languageOf(a);
+    const second = languageOf(b);
+    return (first === second ||
+        RELATED_LANGUAGES.some((group) => group.includes(first) && group.includes(second)));
+}
+/** The text a user reads, without placeholders, URLs or emails; undefined if the message is broken. */
+function visibleText(describe, value) {
+    const info = describe(value);
+    return info.error ? undefined : info.text.replace(URL_OR_EMAIL, ' ');
+}
+function wordCount(text) {
+    return text.match(WORD)?.length ?? 0;
+}
+function ignoredSet(values) {
+    return new Set(values.map((value) => value.trim().toLowerCase()));
+}
 
 const checks = {
     'missing-keys': missingKeys,
@@ -86810,6 +86901,10 @@ function renderGroup(group, input, heading) {
         for (const issue of group.issues) {
             const where = location(issue, input);
             out += `- ${issue.message}${where ? ` · ${where}` : ''}\n`;
+            if (issue.details?.length) {
+                const lines = issue.details.map((line) => `  - ${cell(line)}`);
+                out += `  <details><summary>${count(issue.details.length, 'key', 'keys')}</summary>\n\n${lines.join('\n')}\n\n  </details>\n`;
+            }
         }
     }
     return out;
