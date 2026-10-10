@@ -179,12 +179,15 @@ A pull request from a fork gets a read-only token, so Locale Guard cannot write
 the comment. It does not fail because of that: the results go to the job summary
 and the annotations, and the log says why there is no comment.
 
-> [!WARNING] Do not switch to `pull_request_target` to get the comment on fork
-> pull requests if the workflow checks out the pull request's code. That trigger
-> runs with a write token and your secrets, and checking out code from a fork
-> with it lets anyone who opens a pull request run code with those permissions.
-> Keep `pull_request`. See GitHub Security Lab's
+<!-- prettier-ignore-start -->
+> [!WARNING]
+> Do not switch to `pull_request_target` to get the comment on fork pull
+> requests if the workflow checks out the pull request's code. That trigger runs
+> with a write token and your secrets, and checking out code from a fork with it
+> lets anyone who opens a pull request run code with those permissions. Keep
+> `pull_request`. See GitHub Security Lab's
 > [Preventing pwn requests](https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/).
+<!-- prettier-ignore-end -->
 
 The workflow needs only these permissions:
 
