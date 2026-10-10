@@ -90,6 +90,45 @@ describe('renderReport', () => {
     expect(body).toContain('```yaml\ncoupon:\n  invalid: ""\n```')
   })
 
+  it('keeps flat keys flat in the copy-paste block, as react-intl expects', async () => {
+    const body = await report({
+      'locales/en.json': json({
+        'cart.title': 'Your cart',
+        'cart.total': 'Total: {total}',
+        nav: { home: 'Home' }
+      }),
+      'locales/ar.json': json({ other: 'x' })
+    })
+    expect(body).toContain(
+      [
+        '```json',
+        '{',
+        '  "cart.title": "",',
+        '  "cart.total": "",',
+        '  "nav": {',
+        '    "home": ""',
+        '  }',
+        '}',
+        '```'
+      ].join('\n')
+    )
+  })
+
+  it('links keys of a namespace file the locale does not have to the base file', async () => {
+    const body = await report(
+      {
+        'locales/en/common.json': json({ save: 'Save' }),
+        'locales/en/billing.json': json({ title: 'Billing' }),
+        'locales/ar/common.json': json({ save: 'حفظ' })
+      },
+      { patterns: ['locales/{locale}/*.json'] }
+    )
+    expect(body).toContain(
+      '| [`billing.title`](https://x/locales/en/billing.json#L2) | Billing |'
+    )
+    expect(body).toContain('Copy-paste for locales/ar/billing.json')
+  })
+
   it('lists other issues with their location, errors before warnings', async () => {
     const body = await report({
       'locales/en.json': json({ a: 'Hi {name}', b: 'B' }),

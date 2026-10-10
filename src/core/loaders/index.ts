@@ -139,6 +139,7 @@ export async function loadProject(
           locale.entries.set(key, {
             key,
             fileKey: entry.key,
+            filePath: entry.path,
             value: entry.value,
             file: file.path,
             line: entry.line,

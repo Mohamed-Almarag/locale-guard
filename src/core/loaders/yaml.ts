@@ -38,18 +38,20 @@ export function parseYaml(text: string): ParseResult {
     return { line, column: col }
   }
 
-  const walk = (node: unknown, prefix: string): void => {
+  const walk = (node: unknown, prefix: string, path: string[]): void => {
     const resolved = isAlias(node) ? node.resolve(doc as Document) : node
 
     if (isMap(resolved)) {
       for (const pair of resolved.items) {
         const keyNode = pair.key
-        const key = joinKey(
-          prefix,
-          scalarToString(isScalar(keyNode) ? keyNode.value : keyNode)
-        )
+        const name = scalarToString(isScalar(keyNode) ? keyNode.value : keyNode)
         const offset = isScalar(keyNode) ? (keyNode.range?.[0] ?? 0) : 0
-        visit(key, pair.value, position(offset))
+        visit(
+          joinKey(prefix, name),
+          [...path, name],
+          pair.value,
+          position(offset)
+        )
       }
     } else if (isSeq(resolved)) {
       resolved.items.forEach((item, index) => {
@@ -57,23 +59,30 @@ export function parseYaml(text: string): ParseResult {
           isScalar(item) || isMap(item) || isSeq(item)
             ? (item.range?.[0] ?? 0)
             : 0
-        visit(joinKey(prefix, String(index)), item, position(offset))
+        visit(
+          joinKey(prefix, String(index)),
+          [...path, String(index)],
+          item,
+          position(offset)
+        )
       })
     }
   }
 
   const visit = (
     key: string,
+    path: string[],
     value: unknown,
     at: { line: number; column: number }
   ): void => {
     nodes.push({ key, ...at })
     const resolved = isAlias(value) ? value.resolve(doc as Document) : value
     if (isMap(resolved) || isSeq(resolved)) {
-      walk(resolved, key)
+      walk(resolved, key, path)
     } else {
       entries.push({
         key,
+        path,
         value: scalarToString(isScalar(resolved) ? resolved.value : resolved),
         ...at
       })
@@ -94,6 +103,6 @@ export function parseYaml(text: string): ParseResult {
     }
   }
 
-  walk(doc.contents, '')
+  walk(doc.contents, '', [])
   return { ok: true, entries, nodes }
 }

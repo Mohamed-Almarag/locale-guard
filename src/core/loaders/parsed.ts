@@ -2,6 +2,8 @@ import type { Position } from '../types.js'
 
 export interface ParsedEntry extends Position {
   key: string
+  /** The key's segments as written: a flat `"cart.title"` stays one segment. */
+  path: string[]
   value: string
 }
 

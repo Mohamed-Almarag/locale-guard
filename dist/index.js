@@ -86694,7 +86694,7 @@ function parseJson(text) {
     }
     const entries = [];
     const nodes = [];
-    const walk = (node, prefix) => {
+    const walk = (node, prefix, path) => {
         const children = node.type === 'object'
             ? (node.children ?? []).flatMap((property) => {
                 const [keyNode, valueNode] = property.children ?? [];
@@ -86715,21 +86715,23 @@ function parseJson(text) {
             }));
         for (const child of children) {
             const key = joinKey(prefix, child.key);
+            const childPath = [...path, child.key];
             const position = lines.position(child.offset);
             nodes.push({ key, ...position });
             if (child.value.type === 'object' || child.value.type === 'array') {
-                walk(child.value, key);
+                walk(child.value, key, childPath);
             }
             else {
                 entries.push({
                     key,
+                    path: childPath,
                     value: scalarToString(child.value.value),
                     ...position
                 });
             }
         }
     };
-    walk(root, '');
+    walk(root, '', []);
     return { ok: true, entries, nodes };
 }
 function describe(code) {
@@ -86774,14 +86776,14 @@ function parseYaml(text) {
         const { line, col } = lineCounter.linePos(offset);
         return { line, column: col };
     };
-    const walk = (node, prefix) => {
+    const walk = (node, prefix, path) => {
         const resolved = isAlias(node) ? node.resolve(doc) : node;
         if (isMap(resolved)) {
             for (const pair of resolved.items) {
                 const keyNode = pair.key;
-                const key = joinKey(prefix, scalarToString(isScalar(keyNode) ? keyNode.value : keyNode));
+                const name = scalarToString(isScalar(keyNode) ? keyNode.value : keyNode);
                 const offset = isScalar(keyNode) ? (keyNode.range?.[0] ?? 0) : 0;
-                visit(key, pair.value, position(offset));
+                visit(joinKey(prefix, name), [...path, name], pair.value, position(offset));
             }
         }
         else if (isSeq(resolved)) {
@@ -86789,19 +86791,20 @@ function parseYaml(text) {
                 const offset = isScalar(item) || isMap(item) || isSeq(item)
                     ? (item.range?.[0] ?? 0)
                     : 0;
-                visit(joinKey(prefix, String(index)), item, position(offset));
+                visit(joinKey(prefix, String(index)), [...path, String(index)], item, position(offset));
             });
         }
     };
-    const visit = (key, value, at) => {
+    const visit = (key, path, value, at) => {
         nodes.push({ key, ...at });
         const resolved = isAlias(value) ? value.resolve(doc) : value;
         if (isMap(resolved) || isSeq(resolved)) {
-            walk(resolved, key);
+            walk(resolved, key, path);
         }
         else {
             entries.push({
                 key,
+                path,
                 value: scalarToString(isScalar(resolved) ? resolved.value : resolved),
                 ...at
             });
@@ -86820,7 +86823,7 @@ function parseYaml(text) {
             column: 1
         };
     }
-    walk(doc.contents, '');
+    walk(doc.contents, '', []);
     return { ok: true, entries, nodes };
 }
 
@@ -86914,6 +86917,7 @@ async function loadProject(source, options) {
                 locale.entries.set(key, {
                     key,
                     fileKey: entry.key,
+                    filePath: entry.path,
                     value: entry.value,
                     file: file.path,
                     line: entry.line,
@@ -87127,7 +87131,7 @@ function renderGroup(group, input, heading) {
     if (group.check === 'missing-keys') {
         out += `| Key | ${input.project.baseLocale} |\n|---|---|\n`;
         for (const issue of group.issues) {
-            out += `| ${linked(`\`${issue.key}\``, issue, input)} | ${cell(issue.baseValue ?? '')} |\n`;
+            out += `| ${missingKeyLink(issue, input)} | ${cell(issue.baseValue ?? '')} |\n`;
         }
         out += copyPaste(group.issues, input.project);
     }
@@ -87180,9 +87184,24 @@ function location(issue, input) {
     const url = input.link?.(issue.file, issue.line);
     return url ? `[${label}](${url})` : label;
 }
-function linked(text, issue, input) {
-    const url = input.link?.(issue.file, issue.line);
-    return url ? `[${text}](${url})` : text;
+/**
+ * A missing key links to where it belongs in the locale file. When that file
+ * does not exist yet (a namespace file the locale never got), it links to the
+ * key in the base file instead.
+ */
+function missingKeyLink(issue, input) {
+    const { project } = input;
+    const label = `\`${issue.key}\``;
+    const exists = project.locales
+        .get(issue.locale)
+        ?.files.some((file) => file.path === issue.file);
+    const entry = exists
+        ? undefined
+        : project.locales.get(project.baseLocale)?.entries.get(issue.key);
+    const url = entry
+        ? input.link?.(entry.file, entry.line)
+        : input.link?.(issue.file, issue.line);
+    return url ? `[${label}](${url})` : label;
 }
 /** Ready-to-paste nested object with the missing keys and empty values, one block per file. */
 function copyPaste(issues, project) {
@@ -87196,7 +87215,7 @@ function copyPasteBlock(summary, file, issues, project) {
     const base = project.locales.get(project.baseLocale);
     const tree = {};
     for (const issue of issues) {
-        setPath(tree, keyInFile(base, issue.key).split('.'), '');
+        setPath(tree, pathInFile(base, issue.key), '');
     }
     const yaml = /\.ya?ml$/i.test(file);
     const code = yaml ? stringify(tree).trimEnd() : JSON.stringify(tree, null, 2);
@@ -87213,6 +87232,36 @@ function keyInFile(base, key) {
         return entry.fileKey;
     const namespace = base ? namespaceOf(base, key) : '';
     return namespace ? key.slice(namespace.length + 1) : key;
+}
+/**
+ * A key's segments as the base file writes them, so a flat file
+ * (`"cart.title": ""`, as react-intl expects) gets a flat key back. A key the
+ * base lacks (an i18next plural form only Arabic needs) is shaped like the
+ * base key that shares the longest parent with it: `cart.items_few` next to
+ * `cart.items_other`.
+ */
+function pathInFile(base, key) {
+    const entry = base?.entries.get(key);
+    if (entry)
+        return entry.filePath;
+    const inFile = keyInFile(base, key);
+    const namespace = key.slice(0, key.length - inFile.length);
+    let best;
+    for (const other of base?.entries.values() ?? []) {
+        if (other.key.slice(0, other.key.length - other.fileKey.length) !== namespace) {
+            continue;
+        }
+        const parent = other.filePath.slice(0, -1);
+        const prefix = parent.join('.');
+        if (prefix && !inFile.startsWith(`${prefix}.`))
+            continue;
+        if (!best || parent.length > best.length)
+            best = parent;
+    }
+    if (!best)
+        return inFile.split('.');
+    const prefix = best.join('.');
+    return [...best, prefix ? inFile.slice(prefix.length + 1) : inFile];
 }
 function byFile(issues) {
     const files = new Map();
