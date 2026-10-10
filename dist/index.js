@@ -71940,7 +71940,22 @@ function sortIssues(issues) {
         a.locale.localeCompare(b.locale) ||
         a.file.localeCompare(b.file) ||
         (a.line ?? 0) - (b.line ?? 0) ||
-        a.key.localeCompare(b.key));
+        compareKeys(a.key, b.key));
+}
+const PLURAL_FORM = new RegExp(`^(.+_(?:ordinal_)?)(${PLURAL_CATEGORIES.join('|')})$`);
+/**
+ * Alphabetical, except that plural forms of one key keep their natural order:
+ * `items_zero`, `items_one`, `items_two`, `items_few`, `items_many`,
+ * `items_other`.
+ */
+function compareKeys(a, b) {
+    const pluralA = PLURAL_FORM.exec(a);
+    const pluralB = PLURAL_FORM.exec(b);
+    if (pluralA && pluralB && pluralA[1] === pluralB[1]) {
+        return (PLURAL_CATEGORIES.indexOf(pluralA[2]) -
+            PLURAL_CATEGORIES.indexOf(pluralB[2]));
+    }
+    return a.localeCompare(b);
 }
 function rank(issue) {
     return issue.severity === 'error' ? 0 : 1;
@@ -87002,6 +87017,7 @@ const LABELS = {
     'plural-forms': ['missing plural form', 'missing plural forms']
 };
 const CHECK_ORDER = Object.keys(LABELS);
+const PLURAL_SUFFIX = new RegExp(`_(ordinal_)?(?:${PLURAL_CATEGORIES.filter((c) => c !== 'other').join('|')})$`);
 const RESERVED = 400;
 function renderReport(input) {
     const fresh = input.issues.filter((issue) => issue.isNew);
@@ -87185,23 +87201,41 @@ function location(issue, input) {
     return url ? `[${label}](${url})` : label;
 }
 /**
- * A missing key links to where it belongs in the locale file. When that file
- * does not exist yet (a namespace file the locale never got), it links to the
- * key in the base file instead.
+ * A missing key links to its parent object in the locale file, where it should
+ * be added. When the locale has no such parent (a flat key, a new group, or a
+ * namespace file the locale never got), the link would only reach the top of a
+ * file, so it points to the key in the base file instead.
  */
 function missingKeyLink(issue, input) {
     const { project } = input;
     const label = `\`${issue.key}\``;
-    const exists = project.locales
-        .get(issue.locale)
-        ?.files.some((file) => file.path === issue.file);
-    const entry = exists
-        ? undefined
-        : project.locales.get(project.baseLocale)?.entries.get(issue.key);
+    const target = project.locales.get(issue.locale);
+    const inTarget = target?.files.some((file) => file.path === issue.file) &&
+        hasParent(target, issue.key);
+    const base = project.locales.get(project.baseLocale);
+    const entry = inTarget ? undefined : baseEntryOf(base, issue.key);
     const url = entry
         ? input.link?.(entry.file, entry.line)
         : input.link?.(issue.file, issue.line);
     return url ? `[${label}](${url})` : label;
+}
+/** Whether an object that contains the key exists in the locale, below its namespace. */
+function hasParent(locale, key) {
+    const namespace = namespaceOf(locale, key);
+    const parts = key.split('.');
+    for (let length = parts.length - 1; length > 0; length--) {
+        const parent = parts.slice(0, length).join('.');
+        if (parent.length <= namespace.length)
+            return false;
+        if (locale.nodes.has(parent))
+            return true;
+    }
+    return false;
+}
+/** The base entry of a key, or of its `other` form for a plural form the base lacks. */
+function baseEntryOf(base, key) {
+    return (base?.entries.get(key) ??
+        base?.entries.get(key.replace(PLURAL_SUFFIX, '_$1other')));
 }
 /** Ready-to-paste nested object with the missing keys and empty values, one block per file. */
 function copyPaste(issues, project) {

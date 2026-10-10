@@ -76,12 +76,12 @@ describe('i18next plural keys (plain JSON)', () => {
       'locales/ja.json': { title: 'カート' }
     })
     expect(found.map((issue) => `${issue.locale} ${issue.key}`)).toEqual([
+      'ar items_zero',
+      'ar items_one',
+      'ar items_two',
       'ar items_few',
       'ar items_many',
-      'ar items_one',
       'ar items_other',
-      'ar items_two',
-      'ar items_zero',
       'ja items_other'
     ])
     expect(found.every((issue) => issue.check === 'missing-keys')).toBe(true)
@@ -108,12 +108,12 @@ describe('i18next plural keys (plain JSON)', () => {
       [
         '```json',
         '{',
+        '  "items_zero": "",',
+        '  "items_one": "",',
+        '  "items_two": "",',
         '  "items_few": "",',
         '  "items_many": "",',
-        '  "items_one": "",',
-        '  "items_other": "",',
-        '  "items_two": "",',
-        '  "items_zero": ""',
+        '  "items_other": ""',
         '}',
         '```'
       ].join('\n')
@@ -131,11 +131,14 @@ describe('i18next plural keys (plain JSON)', () => {
     const body = renderReport({
       issues: analyze(project, { format: 'json' }),
       project,
-      hasBaseline: false
+      hasBaseline: false,
+      link: (file, line) => `https://x/${file}${line ? `#L${line}` : ''}`
     })
     expect(body).toContain('  "cart.items_few": "",')
-    expect(body).toContain('  "cart.items_zero": ""')
+    expect(body).toContain('  "cart.items_other": ""')
     expect(body).not.toContain('"cart": {')
+    // Arabic-only forms link to the English `other` form, the text to translate.
+    expect(body).toContain('[`cart.items_few`](https://x/locales/en.json#L3)')
   })
 
   it('lets a form leave out the count, but not other placeholders', async () => {

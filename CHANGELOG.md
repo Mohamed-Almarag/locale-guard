@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.3] - 2026-10-10
+
+### Fixed
+
+- A missing key links to its parent object in the locale file only when that
+  parent exists. A flat key, or a key in a group the locale does not have yet,
+  links to the key in the base file instead of to the top of the locale file.
+- Plural forms of one key are listed in their natural order (`zero`, `one`,
+  `two`, `few`, `many`, `other`) in the comment and in the copy-paste block.
+
 ## [1.0.2] - 2026-10-10
 
 ### Fixed
@@ -62,6 +72,7 @@ First release.
 - `fail-on`, `fail-on-existing`, `ignore-keys`, `ignore-locales`,
   `ignore-values` and `disable-checks`.
 
+[1.0.3]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.3
 [1.0.2]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.2
 [1.0.1]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.0

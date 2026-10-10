@@ -1,7 +1,7 @@
 {
   "name": "locale-guard",
   "description": "GitHub Action that checks translation files on every pull request",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "Mohamed Almearag",
   "type": "module",
   "private": true,
