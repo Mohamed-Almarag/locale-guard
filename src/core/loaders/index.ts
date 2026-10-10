@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import picomatch from 'picomatch'
 import { glob } from 'tinyglobby'
+import { intlLocale } from '../locale-code.js'
 import type { Issue, Locale, LocaleFile, Project } from '../types.js'
 import { parseJson } from './json.js'
 import type { ParseResult } from './parsed.js'
@@ -64,12 +65,18 @@ export async function loadProject(
 ): Promise<Project> {
   const ignored = new Set(options.ignoreLocales ?? [])
   const found = new Map<string, LocaleFile[]>()
+  const skipped: string[] = []
 
   for (const pattern of options.patterns) {
     const paths = await source.glob([toGlob(pattern)])
     for (const path of paths.sort()) {
       const match = matchPattern(pattern, path)
       if (!match || ignored.has(match.locale)) continue
+      // e.g. locales/vee-validate-ur.json next to the real locale files.
+      if (!intlLocale(match.locale)) {
+        skipped.push(path)
+        continue
+      }
       const files = found.get(match.locale) ?? []
       if (!files.some((file) => file.path === path)) {
         files.push({ path, namespace: match.namespace })
@@ -147,7 +154,8 @@ export async function loadProject(
   return {
     baseLocale: options.baseLocale,
     locales: new Map([...locales].sort(([a], [b]) => a.localeCompare(b))),
-    parseErrors
+    parseErrors,
+    skipped
   }
 }
 

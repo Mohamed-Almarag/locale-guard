@@ -19,9 +19,8 @@ describe('describeVueMessage', () => {
     expect(info.placeholders).toEqual(['@:common.cancel', '@:common.save'])
   })
 
-  it('counts plural branches and merges their placeholders', () => {
+  it('merges the placeholders of plural branches', () => {
     const info = describeVueMessage('no items | one item | {count} items')
-    expect(info.plurals).toEqual([{ kind: 'vue', branches: 3 }])
     expect(info.placeholders).toEqual(['{count}'])
   })
 
@@ -56,7 +55,6 @@ describe('describeIcuMessage', () => {
     expect(info.placeholders).toEqual(['{count}', '{name}'])
     expect(info.plurals).toEqual([
       {
-        kind: 'icu',
         argument: 'count',
         ordinal: false,
         options: ['=0', 'one', 'other']

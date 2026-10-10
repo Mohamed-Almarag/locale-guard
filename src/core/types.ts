@@ -53,6 +53,8 @@ export interface Project {
   locales: Map<string, Locale>
   /** Files that could not be parsed. Their locale is loaded without them. */
   parseErrors: Issue[]
+  /** Files that match a pattern but whose {locale} part is not a locale code. */
+  skipped: string[]
 }
 
 export interface Issue {
@@ -65,5 +67,7 @@ export interface Issue {
   column?: number
   message: string
   baseValue?: string
+  /** Extra lines shown collapsed under the issue, e.g. every key of a grouped issue. */
+  details?: string[]
   isNew: boolean
 }

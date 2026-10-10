@@ -9,20 +9,30 @@ export interface CheckContext {
   targets: Locale[]
   /** Parses a message in the project's format. Results are cached. */
   describe: (source: string) => MessageInfo
+  /** Values that may stay identical to the base or in another script (brand names). */
+  ignoreValues: string[]
 }
 
 export type Check = (context: CheckContext) => Issue[]
 
 export function createContext(
   project: Project,
-  format: Format
+  format: Format,
+  ignoreValues: string[] = []
 ): CheckContext | undefined {
   const base = project.locales.get(project.baseLocale)
   if (!base) return undefined
   const targets = [...project.locales.values()].filter(
     (locale) => locale.code !== base.code
   )
-  return { project, format, base, targets, describe: createDescriber(format) }
+  return {
+    project,
+    format,
+    base,
+    targets,
+    describe: createDescriber(format),
+    ignoreValues
+  }
 }
 
 /** The namespace a key belongs to in a locale: the longest file namespace that prefixes it. */

@@ -4,7 +4,7 @@ import {
   type ResourceNode,
   createParser
 } from '@intlify/message-compiler'
-import { type MessageInfo, type PluralInfo, finalize } from './message.js'
+import { type MessageInfo, finalize } from './message.js'
 
 // Mirrors NodeTypes from @intlify/message-compiler. It is a `const enum`, which
 // cannot be imported under `isolatedModules`.
@@ -43,16 +43,12 @@ export function describeVueMessage(source: string): MessageInfo {
 
   const placeholders: string[] = []
   const linkedKeys: string[] = []
-  const plurals: PluralInfo[] = []
   let text = ''
 
   const messages: MessageNode[] =
     ast.body.type === PLURAL
       ? (ast.body as { cases: MessageNode[] }).cases
       : [ast.body as MessageNode]
-  if (ast.body.type === PLURAL) {
-    plurals.push({ kind: 'vue', branches: messages.length })
-  }
 
   for (const message of messages) {
     for (const item of message.items) {
@@ -87,7 +83,7 @@ export function describeVueMessage(source: string): MessageInfo {
     text += ' '
   }
 
-  return finalize({ placeholders, linkedKeys, plurals, text: text.trim() })
+  return finalize({ placeholders, linkedKeys, plurals: [], text: text.trim() })
 }
 
 function failed(error: string): MessageInfo {

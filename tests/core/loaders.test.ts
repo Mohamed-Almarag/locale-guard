@@ -89,6 +89,19 @@ describe('parseYaml', () => {
     expect(parseYaml('')).toEqual({ ok: true, entries: [], nodes: [] })
   })
 
+  it('treats a file with only a document marker or comments as no keys', () => {
+    const empty = { ok: true, entries: [], nodes: [] }
+    expect(parseYaml('---\r\n')).toEqual(empty)
+    expect(parseYaml('# translated later\n')).toEqual(empty)
+  })
+
+  it('still rejects a scalar at the top level', () => {
+    expect(parseYaml('just text\n')).toMatchObject({
+      ok: false,
+      message: 'Expected a map of keys at the top level'
+    })
+  })
+
   it('reports invalid YAML with its line', () => {
     const result = parseYaml('a: 1\nb: [1, 2\nc: 3\n')
     expect(result).toMatchObject({ ok: false, line: expect.any(Number) })
@@ -150,6 +163,16 @@ describe('loadProject', () => {
     const en = project.locales.get('en')
     expect(en?.entries.has('common.save')).toBe(true)
     expect(en?.brokenNamespaces).toEqual(new Set(['checkout']))
+  })
+
+  it('skips files whose locale part is not a locale code', async () => {
+    const project = await load({
+      'locales/en.json': json({ a: 'A' }),
+      'locales/ur.json': json({ a: 'ا' }),
+      'locales/vee-validate-ur.json': json({ messages: { required: 'x' } })
+    })
+    expect([...project.locales.keys()]).toEqual(['en', 'ur'])
+    expect(project.skipped).toEqual(['locales/vee-validate-ur.json'])
   })
 
   it('ignores a byte order mark', async () => {

@@ -10,6 +10,7 @@ async function report(
     patterns?: string[]
     maxLength?: number
     mark?: (i: Issue) => Issue
+    existing?: 'list' | 'counts'
   } = {}
 ) {
   const project = await load(files, { patterns: options.patterns })
@@ -22,7 +23,8 @@ async function report(
     hasBaseline: Boolean(options.mark),
     link: (file, line) => `https://x/${file}${line ? `#L${line}` : ''}`,
     maxLength: options.maxLength,
-    summaryUrl: 'https://x/run'
+    summaryUrl: 'https://x/run',
+    existing: options.existing
   })
 }
 
@@ -118,6 +120,56 @@ describe('renderReport', () => {
     expect(body).toContain('#### ❌ ar: 2 missing keys')
   })
 
+  it('shares one table between locales that miss the same keys', async () => {
+    const body = await report({
+      'locales/en.json': json({ a: 'A', b: 'B' }),
+      'locales/ar.json': json({}),
+      'locales/fr.json': json({}),
+      'locales/de.json': json({ a: 'A-de' })
+    })
+    expect(body).toContain(
+      [
+        '### ❌ 2 locales: 2 missing keys',
+        '',
+        'Missing in `ar`, `fr`.',
+        '',
+        '| Key | en |',
+        '|---|---|',
+        '| [`a`](https://x/locales/en.json#L2) | A |',
+        '| [`b`](https://x/locales/en.json#L3) | B |',
+        '',
+        '<details><summary>📋 Copy-paste for locales/{locale}.json (the same in each locale)</summary>'
+      ].join('\n')
+    )
+    expect(body).toContain('### ❌ de: 1 missing key')
+    expect(body.match(/Copy-paste for/g)).toHaveLength(2)
+  })
+
+  it('can show existing issues as a count table, to keep the comment small', async () => {
+    const body = await report(
+      {
+        'locales/en.json': json({ a: 'A', b: 'B', c: 'Hi {name}' }),
+        'locales/ar.json': json({ c: 'مرحبا', z: 'ز' })
+      },
+      { mark: (i) => ({ ...i, isNew: false }), existing: 'counts' }
+    )
+    expect(body).toContain(
+      [
+        '<details><summary>4 existing issues</summary>',
+        '',
+        '| Locale | Issue | Count |',
+        '|---|---|---|',
+        '| ar | ❌ missing keys | 2 |',
+        '| ar | ❌ placeholder mismatch | 1 |',
+        '| ar | ⚠️ extra key | 1 |',
+        '',
+        'Every issue is listed in the [job summary](https://x/run).',
+        '</details>'
+      ].join('\n')
+    )
+    expect(body).not.toContain('`b`')
+  })
+
   it('says the pull request adds nothing new when only old issues remain', async () => {
     const body = await report(
       { 'locales/en.json': json({ a: 'A' }), 'locales/ar.json': json({}) },
@@ -145,6 +197,46 @@ describe('renderReport', () => {
     expect(body.length).toBeLessThanOrEqual(30_000)
     expect(body).toMatch(
       /…and \d+ more issues, see the \[job summary\]\(https:\/\/x\/run\)\./
+    )
+  })
+
+  it('does not point the job summary at itself when it is cut', async () => {
+    const many = Object.fromEntries(
+      Array.from({ length: 400 }, (_, i) => [`key${i}`, `Value number ${i}`])
+    )
+    const project = await load({
+      'locales/en.json': json(many),
+      'locales/ar.json': json({}),
+      'locales/fr.json': json({})
+    })
+    const body = renderReport({
+      issues: analyze(project, { format: 'json' }),
+      project,
+      hasBaseline: false,
+      maxLength: 5_000
+    })
+    expect(body).toMatch(
+      /…and \d+ more issues not shown, because this page reached its size limit\./
+    )
+    expect(body).not.toContain('see the job summary')
+  })
+
+  it('lists the keys of a grouped issue in a collapsed block', async () => {
+    const body = await report({
+      'locales/en.json': json({ a: 'Change password', b: 'Password changed' }),
+      'locales/fr.json': json({ a: 'Şifre Değiştir', b: 'Şifre Değiştirildi' }),
+      'locales/tr.json': json({ a: 'Şifre Değiştir', b: 'Şifre Değiştirildi' })
+    })
+    expect(body).toContain(
+      [
+        '- fr and tr have identical values, so one file was probably copied into the other · [fr.json:2](https://x/locales/fr.json#L2)',
+        '  <details><summary>2 keys</summary>',
+        '',
+        '  - `a`: Şifre Değiştir',
+        '  - `b`: Şifre Değiştirildi',
+        '',
+        '  </details>'
+      ].join('\n')
     )
   })
 

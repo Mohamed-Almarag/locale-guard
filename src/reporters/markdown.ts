@@ -14,6 +14,12 @@ export interface ReportInput {
   /** Longest allowed output. Issues past it are replaced by a pointer to the job summary. */
   maxLength?: number
   summaryUrl?: string
+  /**
+   * How to show issues that existed before the pull request: every issue (job
+   * summary), or a count per locale and check (PR comment, which stays small
+   * on projects with many old issues).
+   */
+  existing?: 'list' | 'counts'
 }
 
 const LABELS: Record<CheckId, [singular: string, plural: string]> = {
@@ -42,13 +48,15 @@ export function renderReport(input: ReportInput): string {
   }
 
   let omitted = 0
-  for (const group of groupIssues(fresh)) {
+  for (const group of mergeMissingKeys(groupIssues(fresh))) {
     const section = `\n${renderGroup(group, input, '###')}`
     if (body.length + section.length > limit) omitted += group.issues.length
     else body += section
   }
 
-  if (existing.length > 0) {
+  if (existing.length > 0 && input.existing === 'counts') {
+    body += `\n${existingCounts(existing, input.summaryUrl)}`
+  } else if (existing.length > 0) {
     let details = `\n<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`
     for (const group of groupIssues(existing)) {
       const section = `\n${renderGroup(group, input, '####')}`
@@ -60,12 +68,26 @@ export function renderReport(input: ReportInput): string {
   }
 
   if (omitted > 0) {
-    const where = input.summaryUrl
-      ? `[job summary](${input.summaryUrl})`
-      : 'job summary'
-    body += `\n…and ${count(omitted, 'more issue', 'more issues')}, see the ${where}.\n`
+    // Without a summary link this is the job summary itself, which has nowhere else to point.
+    const rest = input.summaryUrl
+      ? `, see the [job summary](${input.summaryUrl})`
+      : ' not shown, because this page reached its size limit'
+    body += `\n…and ${count(omitted, 'more issue', 'more issues')}${rest}.\n`
   }
   return body
+}
+
+function existingCounts(existing: Issue[], summaryUrl?: string): string {
+  let table = '| Locale | Issue | Count |\n|---|---|---|\n'
+  for (const group of groupIssues(existing)) {
+    const icon = group.severity === 'error' ? '❌' : '⚠️'
+    const [singular, plural] = LABELS[group.check]
+    table += `| ${group.locale} | ${icon} ${group.issues.length === 1 ? singular : plural} | ${group.issues.length} |\n`
+  }
+  const where = summaryUrl
+    ? `[job summary](${summaryUrl})`
+    : 'job summary of this run'
+  return `<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n\n${table}\nEvery issue is listed in the ${where}.\n</details>\n`
 }
 
 function title(fresh: Issue[], existing: Issue[]): string {
@@ -87,6 +109,8 @@ function title(fresh: Issue[], existing: Issue[]): string {
 interface Group {
   severity: Issue['severity']
   locale: string
+  /** More than one when the same keys are missing in several locales. */
+  locales: string[]
   check: CheckId
   issues: Issue[]
 }
@@ -98,6 +122,7 @@ function groupIssues(issues: Issue[]): Group[] {
     const group = groups.get(id) ?? {
       severity: issue.severity,
       locale: issue.locale,
+      locales: [issue.locale],
       check: issue.check,
       issues: []
     }
@@ -112,11 +137,48 @@ function groupIssues(issues: Issue[]): Group[] {
   )
 }
 
+/**
+ * A new key added to the base locale is usually missing in every other locale
+ * at once. Instead of repeating the same table for each locale, locales that
+ * miss exactly the same keys share one section.
+ */
+function mergeMissingKeys(groups: Group[]): Group[] {
+  const merged: Group[] = []
+  const bySignature = new Map<string, Group>()
+  for (const group of groups) {
+    if (group.check !== 'missing-keys') {
+      merged.push(group)
+      continue
+    }
+    const signature = group.issues
+      .map((issue) => issue.key)
+      .sort()
+      .join('\u0000')
+    const same = bySignature.get(signature)
+    if (same) {
+      same.locales.push(group.locale)
+      same.issues.push(...group.issues)
+    } else {
+      const copy = {
+        ...group,
+        locales: [group.locale],
+        issues: [...group.issues]
+      }
+      bySignature.set(signature, copy)
+      merged.push(copy)
+    }
+  }
+  return merged
+}
+
 function renderGroup(
   group: Group,
   input: ReportInput,
   heading: string
 ): string {
+  if (group.locales.length > 1)
+    return renderSharedMissingKeys(group, input, heading)
+
   const icon = group.severity === 'error' ? '❌' : '⚠️'
   const [singular, plural] = LABELS[group.check]
   let out = `${heading} ${icon} ${group.locale}: ${count(group.issues.length, singular, plural)}\n\n`
@@ -131,9 +193,59 @@ function renderGroup(
     for (const issue of group.issues) {
       const where = location(issue, input)
       out += `- ${issue.message}${where ? ` · ${where}` : ''}\n`
+      if (issue.details?.length) {
+        const lines = issue.details.map((line) => `  - ${cell(line)}`)
+        out += `  <details><summary>${count(issue.details.length, 'key', 'keys')}</summary>\n\n${lines.join('\n')}\n\n  </details>\n`
+      }
     }
   }
   return out
+}
+
+/** One table for keys that are missing in several locales, linked to the base file. */
+function renderSharedMissingKeys(
+  group: Group,
+  input: ReportInput,
+  heading: string
+): string {
+  const { project } = input
+  const base = project.locales.get(project.baseLocale)
+  const first = group.issues.filter((issue) => issue.locale === group.locale)
+  const locales = group.locales.map((code) => `\`${code}\``).join(', ')
+
+  let out = `${heading} ❌ ${group.locales.length} locales: ${count(first.length, 'missing key', 'missing keys')}\n\n`
+  out += `Missing in ${locales}.\n\n`
+  out += `| Key | ${project.baseLocale} |\n|---|---|\n`
+  for (const issue of first) {
+    const entry = base?.entries.get(issue.key)
+    const url = entry ? input.link?.(entry.file, entry.line) : undefined
+    const key = `\`${issue.key}\``
+    out += `| ${url ? `[${key}](${url})` : key} | ${cell(issue.baseValue ?? '')} |\n`
+  }
+
+  for (const [file, fileIssues] of byFile(first)) {
+    out += copyPasteBlock(
+      `Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale)`,
+      file,
+      fileIssues,
+      project
+    )
+  }
+  return out
+}
+
+/** `locales/ar/common.json` becomes `locales/{locale}/common.json`. */
+function withLocalePlaceholder(path: string, locale: string): string {
+  return path
+    .split('/')
+    .map((segment) =>
+      segment === locale
+        ? '{locale}'
+        : segment.startsWith(`${locale}.`)
+          ? `{locale}${segment.slice(locale.length)}`
+          : segment
+    )
+    .join('/')
 }
 
 function location(issue: Issue, input: ReportInput): string {
@@ -150,24 +262,36 @@ function linked(text: string, issue: Issue, input: ReportInput): string {
 
 /** Ready-to-paste nested object with the missing keys and empty values, one block per file. */
 function copyPaste(issues: Issue[], project: Project): string {
-  const base = project.locales.get(project.baseLocale)
-  const byFile = new Map<string, Issue[]>()
-  for (const issue of issues) {
-    byFile.set(issue.file, [...(byFile.get(issue.file) ?? []), issue])
-  }
-
   let out = ''
-  for (const [file, fileIssues] of byFile) {
-    const tree: Record<string, unknown> = {}
-    for (const issue of fileIssues) {
-      const fileKey = base?.entries.get(issue.key)?.fileKey ?? issue.key
-      setPath(tree, fileKey.split('.'), '')
-    }
-    const yaml = /\.ya?ml$/i.test(file)
-    const code = yaml ? toYaml(tree).trimEnd() : JSON.stringify(tree, null, 2)
-    out += `\n<details><summary>📋 Copy-paste for ${file}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`
+  for (const [file, fileIssues] of byFile(issues)) {
+    out += copyPasteBlock(`Copy-paste for ${file}`, file, fileIssues, project)
   }
   return out
+}
+
+function copyPasteBlock(
+  summary: string,
+  file: string,
+  issues: Issue[],
+  project: Project
+): string {
+  const base = project.locales.get(project.baseLocale)
+  const tree: Record<string, unknown> = {}
+  for (const issue of issues) {
+    const fileKey = base?.entries.get(issue.key)?.fileKey ?? issue.key
+    setPath(tree, fileKey.split('.'), '')
+  }
+  const yaml = /\.ya?ml$/i.test(file)
+  const code = yaml ? toYaml(tree).trimEnd() : JSON.stringify(tree, null, 2)
+  return `\n<details><summary>📋 ${summary}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`
+}
+
+function byFile(issues: Issue[]): Map<string, Issue[]> {
+  const files = new Map<string, Issue[]>()
+  for (const issue of issues) {
+    files.set(issue.file, [...(files.get(issue.file) ?? []), issue])
+  }
+  return files
 }
 
 function setPath(tree: Record<string, unknown>, path: string[], value: string) {

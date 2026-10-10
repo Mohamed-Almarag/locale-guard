@@ -80,7 +80,11 @@ export function parseYaml(text: string): ParseResult {
     }
   }
 
-  if (doc.contents === null) return { ok: true, entries, nodes }
+  // An empty file, or one with only `---` or comments: a locale with no keys yet.
+  const contents = doc.contents
+  if (contents === null || (isScalar(contents) && contents.value === null)) {
+    return { ok: true, entries, nodes }
+  }
   if (!isMap(doc.contents)) {
     return {
       ok: false,
