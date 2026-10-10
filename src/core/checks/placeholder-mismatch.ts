@@ -2,7 +2,7 @@ import type { Issue } from '../types.js'
 import { type Check, baseEntryFor } from './context.js'
 
 /**
- * F5: the placeholders of a translation differ from the base message.
+ * The placeholders of a translation differ from the base message.
  * Messages that cannot be parsed are left to the invalid-syntax check.
  *
  * vue-i18n linked messages (`@:key`) are not compared: translators often write

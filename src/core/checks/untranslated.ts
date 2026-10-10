@@ -64,7 +64,7 @@ const RELATED_LANGUAGES = [
 const MIN_SHARED_VALUES = 2
 
 /**
- * F7: text that was probably never translated.
+ * Text that was probably never translated.
  *  - identical to the base value, with at least two words (skipped between
  *    variants of one language, e.g. en and en-GB)
  *  - for non-Latin languages, no letter of that language's script at all
@@ -136,7 +136,7 @@ const perValue: Check = (context) => {
  * One issue per pair of locales, with the keys as details, because it is one
  * mistake. It is attached to the first locale of the pair by name, since the
  * tool cannot tell which file is the wrong one. The message and key leave out
- * the count and the keys, so the issue stays "existing" (F9) when a pull
+ * the count and the keys, so the issue stays "existing" when a pull
  * request translates some of the values.
  */
 const sharedValues: Check = ({ base, targets, describe, ignoreValues }) => {

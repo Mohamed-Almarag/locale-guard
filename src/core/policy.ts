@@ -14,7 +14,7 @@ export interface Verdict {
   blocking: Issue[]
 }
 
-/** F13: decides whether the check fails. */
+/** Decides whether the check fails. */
 export function decide(issues: Issue[], options: PolicyOptions): Verdict {
   if (options.failOn === 'never') return { failed: false, blocking: [] }
 

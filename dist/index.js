@@ -71395,7 +71395,7 @@ function swapLocale(path, from, to) {
 }
 
 /**
- * F6: a vue-i18n linked message (`@:common.save`) points to a key that does not
+ * A vue-i18n linked message (`@:common.save`) points to a key that does not
  * exist in the same locale, so the message renders broken.
  */
 const brokenLinkedMessages = ({ format, base, targets, describe }) => {
@@ -71424,7 +71424,7 @@ const brokenLinkedMessages = ({ format, base, targets, describe }) => {
     return issues;
 };
 
-/** F4: a key exists but its value is empty or only whitespace. Checked in every locale. */
+/** A key exists but its value is empty or only whitespace. Checked in every locale. */
 const emptyValues = ({ base, targets }) => {
     const issues = [];
     for (const locale of [base, ...targets]) {
@@ -71449,7 +71449,7 @@ const emptyValues = ({ base, targets }) => {
 };
 
 /**
- * F3: a key exists in a locale but not in the base locale (usually removed or
+ * A key exists in a locale but not in the base locale (usually removed or
  * misspelled). i18next plural forms the base lacks (Arabic `items_few`) are
  * part of a group the base has, so they are not extra.
  */
@@ -71478,7 +71478,7 @@ const extraKeys = ({ base, targets, plurals }) => {
 };
 
 /**
- * Part of F5: a message the i18n library cannot compile. vue-i18n and next-intl
+ * A message the i18n library cannot compile. vue-i18n and next-intl
  * fail at runtime on these, so they are errors in every locale.
  */
 const invalidSyntax = ({ base, targets, describe }) => {
@@ -71506,7 +71506,7 @@ const invalidSyntax = ({ base, targets, describe }) => {
 };
 
 /**
- * F2: a key exists in the base locale but not in another locale.
+ * A key exists in the base locale but not in another locale.
  *
  * An i18next plural group counts as one message: when a locale has some of its
  * forms, the plural-forms check says which are missing. When it has none, the
@@ -71564,7 +71564,7 @@ function missing(target, base, key, baseEntry) {
 }
 
 /**
- * F5: the placeholders of a translation differ from the base message.
+ * The placeholders of a translation differ from the base message.
  * Messages that cannot be parsed are left to the invalid-syntax check.
  *
  * vue-i18n linked messages (`@:key`) are not compared: translators often write
@@ -71627,7 +71627,7 @@ function list$1(placeholders) {
 /** `=0`, `=1` and `=2` cover the categories that only contain that number. */
 const EXACT = { '=0': 'zero', '=1': 'one', '=2': 'two' };
 /**
- * F8: plural messages that miss forms the language needs.
+ * Plural messages that miss forms the language needs.
  *
  * ICU (next-intl): the forms come from `Intl.PluralRules`, so every language
  * works without hand-written tables. A missing `other` is an error, since ICU
@@ -71773,7 +71773,7 @@ const RELATED_LANGUAGES = [
 /** A pair of locales must share at least this many different values to be reported. */
 const MIN_SHARED_VALUES = 2;
 /**
- * F7: text that was probably never translated.
+ * Text that was probably never translated.
  *  - identical to the base value, with at least two words (skipped between
  *    variants of one language, e.g. en and en-GB)
  *  - for non-Latin languages, no letter of that language's script at all
@@ -71839,7 +71839,7 @@ const perValue = (context) => {
  * One issue per pair of locales, with the keys as details, because it is one
  * mistake. It is attached to the first locale of the pair by name, since the
  * tool cannot tell which file is the wrong one. The message and key leave out
- * the count and the keys, so the issue stays "existing" (F9) when a pull
+ * the count and the keys, so the issue stays "existing" when a pull
  * request translates some of the values.
  */
 const sharedValues = ({ base, targets, describe, ignoreValues }) => {
@@ -71955,7 +71955,7 @@ function fingerprint(issue) {
     return [issue.check, issue.locale, issue.key, issue.message].join('\u0000');
 }
 /**
- * F9: marks each issue of the pull request as new, or as existing when the
+ * Marks each issue of the pull request as new, or as existing when the
  * same issue is already on the base branch.
  */
 function markNew(head, base) {
@@ -84780,7 +84780,7 @@ const configSchema = strictObject({
     'disable-checks': list.pipe(array(_enum(CHECK_IDS))).default([])
 });
 /**
- * F17: validates the settings and fills in defaults. Settings come from the
+ * Validates the settings and fills in defaults. Settings come from the
  * optional config file and from action inputs; an input that was set wins.
  */
 function parseConfig(inputs, file) {
@@ -86893,7 +86893,7 @@ function parse(path, raw) {
     return /\.ya?ml$/i.test(path) ? parseYaml(text) : parseJson(text);
 }
 
-/** F13: decides whether the check fails. */
+/** Decides whether the check fails. */
 function decide(issues, options) {
     if (options.failOn === 'never')
         return { failed: false, blocking: [] };
@@ -86907,7 +86907,7 @@ function decide(issues, options) {
  * issues come first and the rest are counted in a single notice.
  */
 const ANNOTATIONS_PER_SEVERITY = 10;
-/** F11: marks issues on their line in the "Files changed" tab. */
+/** Marks issues on their line in the "Files changed" tab. */
 function annotate(issues, baseLocale, sink = core) {
     const ordered = [
         ...issues.filter((issue) => issue.isNew),
@@ -87206,7 +87206,7 @@ function count(n, singular, plural) {
 }
 
 /**
- * F10: keeps a single Locale Guard comment per pull request. It finds the
+ * Keeps a single Locale Guard comment per pull request. It finds the
  * comment by its hidden marker and edits it, so every run updates the same one.
  *
  * A new comment is only created when `createIfMissing` is set, so a clean pull
@@ -87236,7 +87236,7 @@ async function upsertComment(octokit, repo, issueNumber, body, options) {
         return { status: 'created', url: data.html_url };
     }
     catch (error) {
-        // F14: read-only tokens (forks, Dependabot) or missing `pull-requests: write`.
+        // Read-only tokens (forks, Dependabot) or missing `pull-requests: write`.
         const status = error.status;
         if (status === 403 || status === 404) {
             return {
@@ -87286,7 +87286,7 @@ function lineLinker(run, sha) {
 /** Parallel blob downloads, kept low to stay clear of GitHub's secondary rate limits. */
 const CONCURRENCY = 8;
 /**
- * F9: reads the locale files of the base branch through the API, so users do
+ * Reads the locale files of the base branch through the API, so users do
  * not need `fetch-depth: 0` in actions/checkout.
  *
  * Only the folders the patterns can match are listed (e.g. `locales/` for
@@ -87378,7 +87378,7 @@ async function listChangedFiles(octokit, repo, pullNumber) {
         ? [file.filename, file.previous_filename]
         : [file.filename]);
 }
-/** F15: whether any changed file is a locale file or the config file. */
+/** Whether any changed file is a locale file or the config file. */
 function touchesLocales(changed, patterns, extraFiles = []) {
     const isLocale = picomatch(patterns.map(toGlob));
     return changed.some((file) => isLocale(file) || extraFiles.includes(file));
@@ -87386,7 +87386,7 @@ function touchesLocales(changed, patterns, extraFiles = []) {
 
 /** GitHub caps each step summary at 1 MiB. */
 const SUMMARY_LIMIT = 1_000_000;
-/** F12: writes the full report to the job summary page. */
+/** Writes the full report to the job summary page. */
 async function writeSummary(markdown, summary$1 = summary) {
     await summary$1.addRaw(markdown, true).write();
 }
@@ -87431,7 +87431,7 @@ async function check(config, workspace, configPath) {
     const token = getInput('github-token');
     const octokit = token ? getOctokit(token) : undefined;
     const pr = context.pullRequest;
-    // F15: leave quickly when the pull request does not touch translations.
+    // Leave quickly when the pull request does not touch translations.
     if (pr &&
         octokit &&
         (await skipPullRequest(octokit, context, config, configPath))) {
@@ -87471,7 +87471,6 @@ async function check(config, workspace, configPath) {
             existing: 'counts'
         }), issues);
     }
-    // F13
     const verdict = decide(issues, {
         failOn: config['fail-on'],
         failOnExisting: config['fail-on-existing']
@@ -87487,7 +87486,7 @@ async function check(config, workspace, configPath) {
     }
 }
 /**
- * F9: runs the same checks on the base branch. Returns undefined when the base
+ * Runs the same checks on the base branch. Returns undefined when the base
  * cannot be read, so every issue is treated as new instead of failing the run.
  */
 async function analyzeBase(octokit, context, config) {
@@ -87519,7 +87518,7 @@ function analyzeOptions(config) {
         ignoreValues: config['ignore-values']
     };
 }
-/** F17: the optional config file. Undefined when there is none, a message when it is broken. */
+/** The optional config file. Undefined when there is none, a message when it is broken. */
 async function loadConfigFile(workspace, path) {
     let text;
     try {
@@ -87552,7 +87551,7 @@ async function comment(octokit, context, body, issues) {
     const pr = context.pullRequest;
     if (!pr)
         return;
-    // F14: a fork's token is read-only, so do not even try.
+    // A fork's token is read-only, so do not even try.
     if (pr.isFork) {
         info('This pull request comes from a fork, and GitHub gives forks a read-only token, so Locale Guard cannot comment. The results are in the job summary and the annotations.');
         return;

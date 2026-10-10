@@ -8,7 +8,7 @@ export const MARKER = '<!-- locale-guard -->'
 export interface ReportInput {
   issues: Issue[]
   project: Project
-  /** Whether issues were split into new and existing (F9). */
+  /** Whether issues were split into new and existing. */
   hasBaseline: boolean
   /** Builds a link to a line in the repo, when one is available. */
   link?: (file: string, line?: number) => string | undefined

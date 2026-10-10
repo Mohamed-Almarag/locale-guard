@@ -15,7 +15,7 @@ const error = base
 const warning: Issue = { ...base, severity: 'warning', check: 'extra-keys' }
 const oldError: Issue = { ...base, isNew: false }
 
-describe('decide (F13)', () => {
+describe('decide', () => {
   it('fail-on error fails on errors only', () => {
     const options = { failOn: 'error' as const, failOnExisting: false }
     expect(decide([warning], options).failed).toBe(false)

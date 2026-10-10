@@ -2,7 +2,7 @@ name: Locale Guard
 description:
   Check translation files on every pull request for missing keys, broken
   placeholders and untranslated text.
-author: Mohamed Almarag
+author: Mohamed Almearag
 
 branding:
   icon: globe

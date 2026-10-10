@@ -10,7 +10,7 @@ export function fingerprint(issue: Issue): string {
 }
 
 /**
- * F9: marks each issue of the pull request as new, or as existing when the
+ * Marks each issue of the pull request as new, or as existing when the
  * same issue is already on the base branch.
  */
 export function markNew(head: Issue[], base: Issue[]): Issue[] {

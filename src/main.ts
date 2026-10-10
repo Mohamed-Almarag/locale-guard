@@ -87,7 +87,7 @@ async function check(
   const octokit = token ? github.getOctokit(token) : undefined
   const pr = context.pullRequest
 
-  // F15: leave quickly when the pull request does not touch translations.
+  // Leave quickly when the pull request does not touch translations.
   if (
     pr &&
     octokit &&
@@ -153,7 +153,6 @@ async function check(
     )
   }
 
-  // F13
   const verdict = decide(issues, {
     failOn: config['fail-on'],
     failOnExisting: config['fail-on-existing']
@@ -173,7 +172,7 @@ async function check(
 }
 
 /**
- * F9: runs the same checks on the base branch. Returns undefined when the base
+ * Runs the same checks on the base branch. Returns undefined when the base
  * cannot be read, so every issue is treated as new instead of failing the run.
  */
 async function analyzeBase(
@@ -217,7 +216,7 @@ function analyzeOptions(config: Config): AnalyzeOptions {
   }
 }
 
-/** F17: the optional config file. Undefined when there is none, a message when it is broken. */
+/** The optional config file. Undefined when there is none, a message when it is broken. */
 async function loadConfigFile(
   workspace: string,
   path: string
@@ -265,7 +264,7 @@ async function comment(
   const pr = context.pullRequest
   if (!pr) return
 
-  // F14: a fork's token is read-only, so do not even try.
+  // A fork's token is read-only, so do not even try.
   if (pr.isFork) {
     core.info(
       'This pull request comes from a fork, and GitHub gives forks a read-only token, so Locale Guard cannot comment. The results are in the job summary and the annotations.'

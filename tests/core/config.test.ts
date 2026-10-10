@@ -97,7 +97,7 @@ describe('parseConfig', () => {
   })
 })
 
-describe('parseConfig with a config file (F17)', () => {
+describe('parseConfig with a config file', () => {
   it('reads settings from the file, with YAML lists and booleans', () => {
     const result = parseConfig(
       {},

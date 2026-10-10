@@ -7,9 +7,9 @@ export interface AnalyzeOptions {
   format: Format
   /** Checks to skip, by name. */
   disabledChecks?: CheckId[]
-  /** F16: key globs to leave out, e.g. `legacy.*`. */
+  /** Key globs to leave out, e.g. `legacy.*`. */
   ignoreKeys?: string[]
-  /** F16: values allowed to stay untranslated, e.g. brand names. */
+  /** Values allowed to stay untranslated, e.g. brand names. */
   ignoreValues?: string[]
 }
 

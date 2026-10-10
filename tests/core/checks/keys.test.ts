@@ -6,7 +6,7 @@ const en = json({
   auction: { bid: { tooLow: 'Your bid must be higher than {amount}' } }
 })
 
-describe('F2 missing-keys', () => {
+describe('missing-keys', () => {
   it('passes when every locale has every base key', async () => {
     const issues = await run('missing-keys', {
       'locales/en.json': en,
@@ -93,7 +93,7 @@ describe('F2 missing-keys', () => {
   })
 })
 
-describe('F3 extra-keys', () => {
+describe('extra-keys', () => {
   it('passes when no locale has keys outside the base', async () => {
     const issues = await run('extra-keys', {
       'locales/en.json': en,
@@ -141,7 +141,7 @@ describe('F3 extra-keys', () => {
   })
 })
 
-describe('F4 empty-values', () => {
+describe('empty-values', () => {
   it('passes when every value has text', async () => {
     const issues = await run('empty-values', {
       'locales/en.json': en,

@@ -5,7 +5,7 @@ import { json, load, run, summarize } from '../../helpers.js'
 const icu = { format: 'next-intl' as const }
 const vue = { format: 'vue-i18n' as const }
 
-describe('F7 untranslated', () => {
+describe('untranslated', () => {
   it('passes for translated values, numbers and placeholders only', async () => {
     const issues = await run('untranslated', {
       'locales/en.json': json({ a: 'Save', b: '{count}', c: '42', d: '—' }),
@@ -118,7 +118,7 @@ describe('F7 untranslated', () => {
   })
 })
 
-describe('F7 untranslated: values shared by two locales', () => {
+describe('untranslated: values shared by two locales', () => {
   const en = json({
     title: 'Change password',
     done: 'Password changed',
@@ -279,7 +279,7 @@ describe('F7 untranslated: values shared by two locales', () => {
   })
 })
 
-describe('F8 plural-forms: ICU', () => {
+describe('plural-forms: ICU', () => {
   it('passes when every form the language needs is there', async () => {
     const issues = await run(
       'plural-forms',
@@ -391,7 +391,7 @@ describe('F8 plural-forms: ICU', () => {
   })
 })
 
-describe('F8 plural-forms: other formats', () => {
+describe('plural-forms: other formats', () => {
   it('does not run for vue-i18n, where one branch is often right', async () => {
     const issues = await run(
       'plural-forms',
@@ -413,7 +413,7 @@ describe('F8 plural-forms: other formats', () => {
   })
 })
 
-describe('F16 ignore rules', () => {
+describe('ignore rules', () => {
   const files = {
     'locales/en.json': json({ legacy: { a: 'A', b: { c: 'C' } }, keep: 'K' }),
     'locales/ar.json': json({}),

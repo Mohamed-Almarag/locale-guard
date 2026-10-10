@@ -61,7 +61,7 @@ export interface ConfigFile {
 }
 
 /**
- * F17: validates the settings and fills in defaults. Settings come from the
+ * Validates the settings and fills in defaults. Settings come from the
  * optional config file and from action inputs; an input that was set wins.
  */
 export function parseConfig(

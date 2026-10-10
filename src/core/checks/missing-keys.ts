@@ -9,7 +9,7 @@ import {
 import { baseKeyFor, keyFor, neededForms } from './suffix-plurals.js'
 
 /**
- * F2: a key exists in the base locale but not in another locale.
+ * A key exists in the base locale but not in another locale.
  *
  * An i18next plural group counts as one message: when a locale has some of its
  * forms, the plural-forms check says which are missing. When it has none, the
