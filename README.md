@@ -228,12 +228,11 @@ and Japanese, which needs only `_other`, is not asked for `_one`.
 
 ## Tested on real projects
 
-Before the first release, Locale Guard ran on five real projects, open-source
-and in production, built with Vue, Nuxt and Next.js, in JSON and YAML. The
-largest had 70 locales of about 3,000 keys each, and was checked in about 8
-seconds on a laptop. Among the issues it found were placeholders with typos
-(`{fotmat}`, `{Count}`), a stray brace that breaks a message, values copied from
-one language's file into another's, and English text left in non-Latin locales.
+Before the first release, Locale Guard ran on five real projects built with Vue,
+Nuxt and Next.js, in JSON and YAML. The largest had 70 locales of about 3,000
+keys each, and was checked in about 8 seconds on a laptop. Among the issues it
+found were placeholders with typos (`{fotmat}`, `{Count}`), a stray brace that
+breaks a message, and values copied from one language's file into another's.
 
 ## Limits
 
