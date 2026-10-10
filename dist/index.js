@@ -71572,10 +71572,12 @@ const LETTER = /\p{L}/u;
 const WORD = /\p{L}+/gu;
 /**
  * Languages close enough that whole sentences are often written the same way
- * ("Generar Factura" in Spanish and Catalan). Values shared inside a group are
+ * ("Generar Factura" in Spanish and Catalan), or that share characters
+ * ("API Key 管理" in Chinese and Japanese). Values shared inside a group are
  * not reported by the cross-locale rule.
  */
 const RELATED_LANGUAGES = [
+    ['zh', 'ja'],
     ['no', 'nb', 'nn', 'da'],
     ['es', 'ca', 'gl', 'pt', 'ast'],
     ['tr', 'az'],

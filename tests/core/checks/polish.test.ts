@@ -183,6 +183,19 @@ describe('F7 untranslated: values shared by two locales', () => {
     expect(issues).toEqual([])
   })
 
+  it('does not compare Chinese and Japanese, which share characters', async () => {
+    const shared = { title: 'API Key 管理', done: 'Webhook 設定' }
+    const issues = await run('untranslated', {
+      'locales/en.json': json({
+        title: 'API Key Management',
+        done: 'Webhook Settings'
+      }),
+      'locales/ja.json': json(shared),
+      'locales/zh-TW.json': json(shared)
+    })
+    expect(issues).toEqual([])
+  })
+
   it('leaves values equal to the base to the base rule', async () => {
     const issues = await run('untranslated', {
       'locales/en.json': en,
