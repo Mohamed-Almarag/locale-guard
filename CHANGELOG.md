@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-10-10
+
+### Fixed
+
+- `invalid-syntax` messages now start with the key, like every other check, so
+  the annotations list shows which message is broken.
+
 ## [1.0.0] - 2026-10-10
 
 First release.
@@ -45,4 +52,5 @@ First release.
 - `fail-on`, `fail-on-existing`, `ignore-keys`, `ignore-locales`,
   `ignore-values` and `disable-checks`.
 
+[1.0.1]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.0

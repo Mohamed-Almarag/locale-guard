@@ -224,6 +224,7 @@ describe('invalid-syntax', () => {
     expect(issues).toMatchObject([
       { severity: 'error', locale: 'ar', key: 'a', line: 2 }
     ])
+    expect(issues[0]?.message).toMatch(/^`a`: Invalid ICU message: /)
   })
 
   it('never reports plain JSON messages', async () => {
