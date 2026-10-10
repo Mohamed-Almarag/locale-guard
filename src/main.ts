@@ -293,15 +293,27 @@ async function comment(
   }
 }
 
+/**
+ * Lists new issues one per line. Existing issues get one count line: a large
+ * project can have 100,000 of them, and the job summary already lists them.
+ */
 function logIssues(issues: Issue[]): void {
-  if (issues.length === 0) return
-  core.startGroup(
-    `Locale Guard: ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`
-  )
-  for (const issue of issues) {
+  const fresh = issues.filter((issue) => issue.isNew)
+  const existing = issues.length - fresh.length
+  if (fresh.length > 0) {
+    core.startGroup(
+      `Locale Guard: ${fresh.length} new ${fresh.length === 1 ? 'issue' : 'issues'}`
+    )
+    for (const issue of fresh) {
+      core.info(
+        `${issue.severity} ${issue.locale} ${issue.file}${issue.line ? `:${issue.line}` : ''} ${issue.message.replace(/`/g, '')}`
+      )
+    }
+    core.endGroup()
+  }
+  if (existing > 0) {
     core.info(
-      `${issue.severity} ${issue.locale} ${issue.file}${issue.line ? `:${issue.line}` : ''} ${issue.message.replace(/`/g, '')}`
+      `Locale Guard: ${existing} existing ${existing === 1 ? 'issue' : 'issues'} from the base branch, listed in the job summary.`
     )
   }
-  core.endGroup()
 }

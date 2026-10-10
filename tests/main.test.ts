@@ -256,6 +256,20 @@ describe('run', () => {
         /New in this PR: 1 · Already existing: \d+ \(collapsed below\)/
       )
       expect(body).toContain('### ❌ ar: 1 missing key')
+      expect(core.startGroup).toHaveBeenCalledWith('Locale Guard: 1 new issue')
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^error ar locales\/ar\.json:\d+ Missing key auction\.bid\.tooLow$/
+        )
+      )
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^Locale Guard: \d+ existing issues from the base branch, listed in the job summary\.$/
+        )
+      )
+      expect(core.info).not.toHaveBeenCalledWith(
+        expect.stringMatching(/^warning /)
+      )
       expect(core.error).toHaveBeenCalledTimes(1)
       expect(core.setFailed).toHaveBeenCalledWith(
         'Locale Guard found 1 translation issue (fail-on: error).'
