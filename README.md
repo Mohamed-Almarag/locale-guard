@@ -35,7 +35,8 @@ everything, the same comment turns green:
 
 <img src="docs/images/comment-passing.png" alt="Locale Guard comment saying the pull request adds no new translation issues, with two existing issues collapsed" width="700">
 
-A full report also goes to the job summary of each run.
+A pull request that never adds an issue gets no comment at all. A full report
+also goes to the job summary of each run.
 
 ## Quick start
 
