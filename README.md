@@ -249,3 +249,14 @@ breaks a message, and values copied from one language's file into another's.
 ## License
 
 [MIT](LICENSE)
+
+---
+
+<p align="center" dir="rtl">
+  ﴿ مَا مَكَّنِّي فِيهِ رَبِّي خَيْرٌ ﴾
+</p>
+
+<p align="center">
+  <em>"What my Lord has granted me is better."</em><br>
+  <sub>Qur'an, Al-Kahf 18:95</sub>
+</p>
