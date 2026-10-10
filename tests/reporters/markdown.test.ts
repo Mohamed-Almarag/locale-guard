@@ -54,7 +54,7 @@ describe('renderReport', () => {
     expect(body).toContain('## 🌐 Locale Guard: 2 errors')
     expect(body).toContain('### ❌ ar: 2 missing keys')
     expect(body).toContain(
-      '| [`checkout.coupon.invalid`](https://x/locales/ar.json#L1) | Coupon "{code}" is &lt;b&gt;not&lt;/b&gt; valid |'
+      '| [`checkout.coupon.invalid`](https://x/locales/en.json#L4) | Coupon "{code}" is &lt;b&gt;not&lt;/b&gt; valid |'
     )
     expect(body).toContain(
       '<details><summary>📋 Copy-paste for locales/ar.json</summary>'
@@ -112,6 +112,18 @@ describe('renderReport', () => {
         '```'
       ].join('\n')
     )
+  })
+
+  it('links a missing key to its parent when the locale has it, otherwise to the base file', async () => {
+    const body = await report({
+      'locales/en.json': json({
+        checkout: { title: 'Checkout', pay: 'Pay' },
+        'cart.title': 'Cart'
+      }),
+      'locales/ar.json': json({ checkout: { title: 'الدفع' } })
+    })
+    expect(body).toContain('| [`checkout.pay`](https://x/locales/ar.json#L2) |')
+    expect(body).toContain('| [`cart.title`](https://x/locales/en.json#L6) |')
   })
 
   it('links keys of a namespace file the locale does not have to the base file', async () => {

@@ -1,5 +1,6 @@
 import { stringify as toYaml } from 'yaml'
 import { namespaceOf } from '../core/checks/context.js'
+import { PLURAL_CATEGORIES } from '../core/plural-rules.js'
 import type { CheckId, Issue, Locale, Project } from '../core/types.js'
 
 /** Hidden marker that identifies the Locale Guard comment on a pull request. */
@@ -36,6 +37,9 @@ const LABELS: Record<CheckId, [singular: string, plural: string]> = {
 }
 
 const CHECK_ORDER = Object.keys(LABELS) as CheckId[]
+const PLURAL_SUFFIX = new RegExp(
+  `_(ordinal_)?(?:${PLURAL_CATEGORIES.filter((c) => c !== 'other').join('|')})$`
+)
 const RESERVED = 400
 
 export function renderReport(input: ReportInput): string {
@@ -257,23 +261,44 @@ function location(issue: Issue, input: ReportInput): string {
 }
 
 /**
- * A missing key links to where it belongs in the locale file. When that file
- * does not exist yet (a namespace file the locale never got), it links to the
- * key in the base file instead.
+ * A missing key links to its parent object in the locale file, where it should
+ * be added. When the locale has no such parent (a flat key, a new group, or a
+ * namespace file the locale never got), the link would only reach the top of a
+ * file, so it points to the key in the base file instead.
  */
 function missingKeyLink(issue: Issue, input: ReportInput): string {
   const { project } = input
   const label = `\`${issue.key}\``
-  const exists = project.locales
-    .get(issue.locale)
-    ?.files.some((file) => file.path === issue.file)
-  const entry = exists
-    ? undefined
-    : project.locales.get(project.baseLocale)?.entries.get(issue.key)
+  const target = project.locales.get(issue.locale)
+  const inTarget =
+    target?.files.some((file) => file.path === issue.file) &&
+    hasParent(target, issue.key)
+  const base = project.locales.get(project.baseLocale)
+  const entry = inTarget ? undefined : baseEntryOf(base, issue.key)
   const url = entry
     ? input.link?.(entry.file, entry.line)
     : input.link?.(issue.file, issue.line)
   return url ? `[${label}](${url})` : label
+}
+
+/** Whether an object that contains the key exists in the locale, below its namespace. */
+function hasParent(locale: Locale, key: string): boolean {
+  const namespace = namespaceOf(locale, key)
+  const parts = key.split('.')
+  for (let length = parts.length - 1; length > 0; length--) {
+    const parent = parts.slice(0, length).join('.')
+    if (parent.length <= namespace.length) return false
+    if (locale.nodes.has(parent)) return true
+  }
+  return false
+}
+
+/** The base entry of a key, or of its `other` form for a plural form the base lacks. */
+function baseEntryOf(base: Locale | undefined, key: string) {
+  return (
+    base?.entries.get(key) ??
+    base?.entries.get(key.replace(PLURAL_SUFFIX, '_$1other'))
+  )
 }
 
 /** Ready-to-paste nested object with the missing keys and empty values, one block per file. */
