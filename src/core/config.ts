@@ -1,6 +1,7 @@
 import { parse as parseYamlText } from 'yaml'
 import { z } from 'zod'
 import { validatePattern } from './loaders/pattern.js'
+import type { Format } from './types.js'
 
 export const CONFIG_FILE = '.localeguard.yml'
 
@@ -16,6 +17,38 @@ const CHECK_IDS = [
   'plural-forms'
 ] as const
 
+/**
+ * The `format` setting names the library that reads the messages. Libraries
+ * that share a message syntax share a format: react-intl writes ICU messages
+ * just like next-intl, and react-i18next writes plain JSON.
+ */
+export const FORMATS = {
+  'vue-i18n': 'vue-i18n',
+  '@nuxtjs/i18n': 'vue-i18n',
+  icu: 'next-intl',
+  'next-intl': 'next-intl',
+  'use-intl': 'next-intl',
+  'react-intl': 'next-intl',
+  formatjs: 'next-intl',
+  json: 'json',
+  i18next: 'json',
+  'react-i18next': 'json',
+  'next-i18next': 'json',
+  'i18next-vue': 'json'
+} as const satisfies Record<string, Format>
+
+/**
+ * A framework can use more than one library, and each writes messages its own
+ * way, so a framework name is answered with the libraries to choose from.
+ */
+const FRAMEWORKS: Record<string, string> = {
+  nuxt: '@nuxtjs/i18n',
+  vue: 'vue-i18n or i18next-vue',
+  next: 'next-intl or next-i18next',
+  nextjs: 'next-intl or next-i18next',
+  react: 'react-intl or react-i18next'
+}
+
 const list = z
   .union([z.array(z.string()), z.string()])
   .transform((value) =>
@@ -27,7 +60,13 @@ const list = z
 const flag = z.union([z.boolean(), z.stringbool()])
 
 export const configSchema = z.strictObject({
-  format: z.enum(['vue-i18n', 'next-intl', 'json']).default('json'),
+  format: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .pipe(z.enum(Object.keys(FORMATS) as (keyof typeof FORMATS)[]))
+    .default('json')
+    .transform((name) => FORMATS[name]),
   'base-locale': z.string().trim().min(1).default('en'),
   files: list
     .refine(
@@ -91,6 +130,14 @@ export function parseConfig(
       const name = String(issue.path[0] ?? 'config')
       if (!(name in merged)) {
         return `Invalid ${where(name)}: this setting is required`
+      }
+      const value = merged[name as keyof typeof merged]
+      const framework =
+        name === 'format' && typeof value === 'string'
+          ? FRAMEWORKS[value.trim().toLowerCase()]
+          : undefined
+      if (framework) {
+        return `Invalid ${where(name)}: "${value}" is a framework, so name the translation library it uses: ${framework}`
       }
       return `Invalid ${where(name)}: ${describe(issue)} (got ${JSON.stringify(merged[name as keyof typeof merged])})`
     })
