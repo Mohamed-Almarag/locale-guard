@@ -146,7 +146,8 @@ async function check(
       renderReport({
         ...report,
         maxLength: COMMENT_LIMIT,
-        summaryUrl: context.runUrl
+        summaryUrl: context.runUrl,
+        existing: 'counts'
       }),
       issues
     )

@@ -86691,7 +86691,10 @@ function renderReport(input) {
         else
             body += section;
     }
-    if (existing.length > 0) {
+    if (existing.length > 0 && input.existing === 'counts') {
+        body += `\n${existingCounts(existing, input.summaryUrl)}`;
+    }
+    else if (existing.length > 0) {
         let details = `\n<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`;
         for (const group of groupIssues(existing)) {
             const section = `\n${renderGroup(group, input, '####')}`;
@@ -86710,6 +86713,18 @@ function renderReport(input) {
         body += `\n…and ${count(omitted, 'more issue', 'more issues')}, see the ${where}.\n`;
     }
     return body;
+}
+function existingCounts(existing, summaryUrl) {
+    let table = '| Locale | Issue | Count |\n|---|---|---|\n';
+    for (const group of groupIssues(existing)) {
+        const icon = group.severity === 'error' ? '❌' : '⚠️';
+        const [singular, plural] = LABELS[group.check];
+        table += `| ${group.locale} | ${icon} ${group.issues.length === 1 ? singular : plural} | ${group.issues.length} |\n`;
+    }
+    const where = summaryUrl
+        ? `[job summary](${summaryUrl})`
+        : 'job summary of this run';
+    return `<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n\n${table}\nEvery issue is listed in the ${where}.\n</details>\n`;
 }
 function title(fresh, existing) {
     if (fresh.length === 0 && existing.length === 0) {
@@ -87080,7 +87095,8 @@ async function check(config, workspace, configPath) {
         await comment(octokit, context, renderReport({
             ...report,
             maxLength: COMMENT_LIMIT,
-            summaryUrl: context.runUrl
+            summaryUrl: context.runUrl,
+            existing: 'counts'
         }), issues);
     }
     // F13

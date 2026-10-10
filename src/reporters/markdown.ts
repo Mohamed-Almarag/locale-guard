@@ -14,6 +14,12 @@ export interface ReportInput {
   /** Longest allowed output. Issues past it are replaced by a pointer to the job summary. */
   maxLength?: number
   summaryUrl?: string
+  /**
+   * How to show issues that existed before the pull request: every issue (job
+   * summary), or a count per locale and check (PR comment, which stays small
+   * on projects with many old issues).
+   */
+  existing?: 'list' | 'counts'
 }
 
 const LABELS: Record<CheckId, [singular: string, plural: string]> = {
@@ -48,7 +54,9 @@ export function renderReport(input: ReportInput): string {
     else body += section
   }
 
-  if (existing.length > 0) {
+  if (existing.length > 0 && input.existing === 'counts') {
+    body += `\n${existingCounts(existing, input.summaryUrl)}`
+  } else if (existing.length > 0) {
     let details = `\n<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`
     for (const group of groupIssues(existing)) {
       const section = `\n${renderGroup(group, input, '####')}`
@@ -66,6 +74,19 @@ export function renderReport(input: ReportInput): string {
     body += `\n…and ${count(omitted, 'more issue', 'more issues')}, see the ${where}.\n`
   }
   return body
+}
+
+function existingCounts(existing: Issue[], summaryUrl?: string): string {
+  let table = '| Locale | Issue | Count |\n|---|---|---|\n'
+  for (const group of groupIssues(existing)) {
+    const icon = group.severity === 'error' ? '❌' : '⚠️'
+    const [singular, plural] = LABELS[group.check]
+    table += `| ${group.locale} | ${icon} ${group.issues.length === 1 ? singular : plural} | ${group.issues.length} |\n`
+  }
+  const where = summaryUrl
+    ? `[job summary](${summaryUrl})`
+    : 'job summary of this run'
+  return `<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n\n${table}\nEvery issue is listed in the ${where}.\n</details>\n`
 }
 
 function title(fresh: Issue[], existing: Issue[]): string {

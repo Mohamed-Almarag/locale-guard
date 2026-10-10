@@ -10,6 +10,7 @@ async function report(
     patterns?: string[]
     maxLength?: number
     mark?: (i: Issue) => Issue
+    existing?: 'list' | 'counts'
   } = {}
 ) {
   const project = await load(files, { patterns: options.patterns })
@@ -22,7 +23,8 @@ async function report(
     hasBaseline: Boolean(options.mark),
     link: (file, line) => `https://x/${file}${line ? `#L${line}` : ''}`,
     maxLength: options.maxLength,
-    summaryUrl: 'https://x/run'
+    summaryUrl: 'https://x/run',
+    existing: options.existing
   })
 }
 
@@ -116,6 +118,31 @@ describe('renderReport', () => {
     )
     expect(body).toContain('<details><summary>2 existing issues</summary>')
     expect(body).toContain('#### ❌ ar: 2 missing keys')
+  })
+
+  it('can show existing issues as a count table, to keep the comment small', async () => {
+    const body = await report(
+      {
+        'locales/en.json': json({ a: 'A', b: 'B', c: 'Hi {name}' }),
+        'locales/ar.json': json({ c: 'مرحبا', z: 'ز' })
+      },
+      { mark: (i) => ({ ...i, isNew: false }), existing: 'counts' }
+    )
+    expect(body).toContain(
+      [
+        '<details><summary>4 existing issues</summary>',
+        '',
+        '| Locale | Issue | Count |',
+        '|---|---|---|',
+        '| ar | ❌ missing keys | 2 |',
+        '| ar | ❌ placeholder mismatch | 1 |',
+        '| ar | ⚠️ extra key | 1 |',
+        '',
+        'Every issue is listed in the [job summary](https://x/run).',
+        '</details>'
+      ].join('\n')
+    )
+    expect(body).not.toContain('`b`')
   })
 
   it('says the pull request adds nothing new when only old issues remain', async () => {
