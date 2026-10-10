@@ -56,6 +56,34 @@ describe('parseConfig', () => {
     })
   })
 
+  it('accepts the name of any supported translation library as the format', () => {
+    const format = (name: string) => {
+      const result = parseConfig({ files: 'l/{locale}.json', format: name })
+      return result.ok ? result.config.format : result.errors
+    }
+    expect(format('@nuxtjs/i18n')).toBe('vue-i18n')
+    expect(format('react-intl')).toBe('next-intl')
+    expect(format('ICU')).toBe('next-intl')
+    expect(format('react-i18next')).toBe('json')
+    expect(format(' next-intl ')).toBe('next-intl')
+  })
+
+  it('asks for the library when the format names a framework', () => {
+    expect(parseConfig({ files: 'l/{locale}.json', format: 'Nuxt' })).toEqual({
+      ok: false,
+      errors: [
+        'Invalid "format": "Nuxt" is a framework, so name the translation library it uses: @nuxtjs/i18n'
+      ]
+    })
+  })
+
+  it('lists the formats for an unknown one', () => {
+    const result = parseConfig({ files: 'l/{locale}.json', format: 'gettext' })
+    expect(!result.ok && result.errors[0]).toMatch(
+      /^Invalid "format": expected one of vue-i18n, @nuxtjs\/i18n, icu, next-intl/
+    )
+  })
+
   it('requires files', () => {
     expect(parseConfig({})).toEqual({
       ok: false,

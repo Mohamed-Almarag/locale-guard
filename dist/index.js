@@ -84753,13 +84753,48 @@ const CHECK_IDS = [
     'untranslated',
     'plural-forms'
 ];
+/**
+ * The `format` setting names the library that reads the messages. Libraries
+ * that share a message syntax share a format: react-intl writes ICU messages
+ * just like next-intl, and react-i18next writes plain JSON.
+ */
+const FORMATS = {
+    'vue-i18n': 'vue-i18n',
+    '@nuxtjs/i18n': 'vue-i18n',
+    icu: 'next-intl',
+    'next-intl': 'next-intl',
+    'use-intl': 'next-intl',
+    'react-intl': 'next-intl',
+    formatjs: 'next-intl',
+    json: 'json',
+    i18next: 'json',
+    'react-i18next': 'json',
+    'next-i18next': 'json',
+    'i18next-vue': 'json'
+};
+/**
+ * A framework can use more than one library, and each writes messages its own
+ * way, so a framework name is answered with the libraries to choose from.
+ */
+const FRAMEWORKS = {
+    nuxt: '@nuxtjs/i18n',
+    vue: 'vue-i18n or i18next-vue',
+    next: 'next-intl or next-i18next',
+    nextjs: 'next-intl or next-i18next',
+    react: 'react-intl or react-i18next'
+};
 const list = union([array(string()), string()])
     .transform((value) => (Array.isArray(value) ? value : value.split(/[\n,]/))
     .map((item) => item.trim())
     .filter(Boolean));
 const flag = union([boolean(), stringbool()]);
 const configSchema = strictObject({
-    format: _enum(['vue-i18n', 'next-intl', 'json']).default('json'),
+    format: string()
+        .trim()
+        .toLowerCase()
+        .pipe(_enum(Object.keys(FORMATS)))
+        .default('json')
+        .transform((name) => FORMATS[name]),
     'base-locale': string().trim().min(1).default('en'),
     files: list
         .refine((patterns) => patterns.length > 0, 'at least one pattern is required')
@@ -84801,6 +84836,13 @@ function parseConfig(inputs, file) {
             const name = String(issue.path[0] ?? 'config');
             if (!(name in merged)) {
                 return `Invalid ${where(name)}: this setting is required`;
+            }
+            const value = merged[name];
+            const framework = name === 'format' && typeof value === 'string'
+                ? FRAMEWORKS[value.trim().toLowerCase()]
+                : undefined;
+            if (framework) {
+                return `Invalid ${where(name)}: "${value}" is a framework, so name the translation library it uses: ${framework}`;
             }
             return `Invalid ${where(name)}: ${describe$1(issue)} (got ${JSON.stringify(merged[name])})`;
         })

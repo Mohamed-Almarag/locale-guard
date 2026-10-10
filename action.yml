@@ -18,7 +18,11 @@ inputs:
       locales/{locale}.json, messages/{locale}.json, locales/{locale}/*.json
     required: false
   format:
-    description: 'Message format: vue-i18n, next-intl or json. Default: json.'
+    description: >
+      The library that reads your messages. vue-i18n syntax: vue-i18n,
+      @nuxtjs/i18n. ICU syntax: icu, next-intl, use-intl, react-intl, formatjs.
+      Plain JSON: json, i18next, react-i18next, next-i18next, i18next-vue.
+      Default: json.
     required: false
   base-locale:
     description: 'The locale every other locale is compared with. Default: en.'
