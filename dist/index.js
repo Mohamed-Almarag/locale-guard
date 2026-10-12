@@ -69831,6 +69831,14 @@ function parse$4(message, opts = {}) {
 	return result.val;
 }
 
+// Letters with marks, so Hindi or vowelled Arabic stays whole; "E-mail" is one word
+const WORD = /[\p{L}\p{M}]+(?:[-'’][\p{L}\p{M}]+)*/gu;
+function wordCount(text, pattern = WORD) {
+    return text.match(pattern)?.length ?? 0;
+}
+function mostWords(texts) {
+    return texts.reduce((best, text) => (wordCount(text) > wordCount(best) ? text : best), '');
+}
 function finalize$1(info) {
     return {
         ...info,
@@ -69838,16 +69846,10 @@ function finalize$1(info) {
     };
 }
 
-/**
- * Reads an ICU message (next-intl) with the FormatJS parser:
- *   arguments `{amount}`, `{amount, number}`, `{count, plural, ...}`,
- *   `{gender, select, ...}`, and rich text tags `<b>...</b>`.
- */
 function describeIcuMessage(source) {
     let elements;
     try {
-        // `other` is required by ICU, but the plural-forms check reports it with a
-        // clearer message, so the parser must not fail on it.
+        // plural-forms reports a missing `other` with a clearer message
         elements = parse$4(source, { requiresOtherClause: false });
     }
     catch (error) {
@@ -69908,16 +69910,42 @@ function describeIcuMessage(source) {
         placeholders,
         linkedKeys: [],
         plurals,
-        text: text.replace(/\s+/g, ' ').trim()
+        text: text.replace(/\s+/g, ' ').trim(),
+        longestText: hasBranches(elements)
+            ? longestRendering(elements).replace(/\s+/g, ' ').trim()
+            : undefined
     });
+}
+function hasBranches(nodes) {
+    return nodes.some((node) => node.type === TYPE.plural ||
+        node.type === TYPE.select ||
+        (node.type === TYPE.tag && hasBranches(node.children)));
+}
+// Takes the branch with the most words at each plural or select
+function longestRendering(nodes) {
+    return nodes
+        .map((node) => {
+        switch (node.type) {
+            case TYPE.literal:
+                return node.value;
+            case TYPE.plural:
+            case TYPE.select:
+                return mostWords(Object.values(node.options).map((option) => longestRendering(option.value)));
+            case TYPE.tag:
+                return longestRendering(node.children);
+            default:
+                return ' ';
+        }
+    })
+        .join(' ');
 }
 function humanize(code) {
     return code.toLowerCase().replace(/_/g, ' ');
 }
 
-// `{{name}}` (i18next, spaces allowed) and `{name}` (most other libraries).
+// `{{name}}` (i18next, spaces allowed) and `{name}` (most other libraries)
 const PLACEHOLDER = /\{\{\s*([\w.-]+)\s*\}\}|\{([\w.-]+)\}/g;
-/** Plain JSON messages have no grammar, so placeholders are found with a pattern. */
+// Plain JSON has no grammar, so placeholders are found with a pattern
 function describePlainMessage(source) {
     const placeholders = [];
     for (const match of source.matchAll(PLACEHOLDER)) {
@@ -71093,8 +71121,7 @@ function getTokenCaption(token) {
     return name.length > 10 ? name.slice(0, 9) + '…' : name;
 }
 
-// Mirrors NodeTypes from @intlify/message-compiler. It is a `const enum`, which
-// cannot be imported under `isolatedModules`.
+// Mirrors NodeTypes, a `const enum` that `isolatedModules` cannot import
 const PLURAL = 1;
 const TEXT = 3;
 const NAMED = 4;
@@ -71102,11 +71129,6 @@ const LIST = 5;
 const LINKED = 6;
 const LINKED_KEY = 7;
 const LITERAL = 9;
-/**
- * Reads a vue-i18n message with the official compiler:
- *   named `{name}`, list `{0}`, linked `@:common.save` / `@.lower:common.save`,
- *   literal `{'@'}`, and plural branches separated by `|`.
- */
 function describeVueMessage(source) {
     const errors = [];
     let ast;
@@ -71126,11 +71148,13 @@ function describeVueMessage(source) {
     }
     const placeholders = [];
     const linkedKeys = [];
-    let text = '';
-    const messages = ast.body.type === PLURAL
+    const cases = [];
+    const isPlural = ast.body.type === PLURAL;
+    const messages = isPlural
         ? ast.body.cases
         : [ast.body];
     for (const message of messages) {
+        let text = '';
         for (const item of message.items) {
             switch (item.type) {
                 case TEXT:
@@ -71160,9 +71184,15 @@ function describeVueMessage(source) {
                 }
             }
         }
-        text += ' ';
+        cases.push(text.trim());
     }
-    return finalize$1({ placeholders, linkedKeys, plurals: [], text: text.trim() });
+    return finalize$1({
+        placeholders,
+        linkedKeys,
+        plurals: [],
+        text: cases.join(' ').trim(),
+        longestText: isPlural ? mostWords(cases) : undefined
+    });
 }
 function failed(error) {
     return { placeholders: [], linkedKeys: [], plurals: [], text: '', error };
@@ -71173,7 +71203,7 @@ const describers = {
     'next-intl': describeIcuMessage,
     json: describePlainMessage
 };
-/** Returns a describer that parses each distinct message only once. */
+// Parses each distinct message once
 function createDescriber(format) {
     const describe = describers[format];
     const cache = new Map();
@@ -71187,11 +71217,11 @@ function createDescriber(format) {
     };
 }
 
-/** The language part of a locale code: `ar` for `ar-EG` or `ar_EG`. */
+// `ar` for `ar-EG` or `ar_EG`
 function languageOf(code) {
     return code.split(/[-_]/)[0]?.toLowerCase() ?? code;
 }
-/** A locale code that Intl accepts (`pt_BR` becomes `pt-BR`), or undefined. */
+// `pt_BR` becomes `pt-BR`; undefined when Intl rejects it
 function intlLocale(code) {
     try {
         return Intl.getCanonicalLocales(code.replace(/_/g, '-'))[0];
@@ -71201,15 +71231,10 @@ function intlLocale(code) {
     }
 }
 
-/** Plural categories in the order CLDR lists them. */
+// In CLDR order
 const PLURAL_CATEGORIES = ['zero', 'one', 'two', 'few', 'many', 'other'];
 const requiredCache = new Map();
-/**
- * Categories a plural message must cover in a language: the ones that whole
- * numbers from 0 to 1000 reach, plus `other`. This leaves out forms that only
- * apply to millions or decimals, such as French `many`, which almost no
- * project writes.
- */
+// Forms reached by whole numbers 0 to 1000, plus `other`; skips French `many`
 function requiredCategories(locale, ordinal) {
     const id = `${locale}|${ordinal}`;
     const cached = requiredCache.get(id);
@@ -71235,16 +71260,7 @@ function languageName(code) {
 }
 
 const SUFFIX = new RegExp(`^(.+?)_(ordinal_)?(${PLURAL_CATEGORIES.join('|')})$`);
-/**
- * i18next writes each plural form as its own key: `items_one`, `items_other`,
- * and for Arabic also `items_zero`, `items_two`, `items_few`, `items_many`.
- * Compared key by key, a correct Arabic file has "extra" keys and a correct
- * Japanese file (only `items_other`) has "missing" ones.
- *
- * A stem counts as a plural group only when the base locale has its `other`
- * form, which i18next requires. Numbered keys like `note_one`, `note_two`,
- * `note_three` (seen on a real project) stay plain keys.
- */
+// A stem is a plural group only when the base has its `other` form
 class SuffixPlurals {
     groups = new Set();
     constructor(base) {
@@ -71254,12 +71270,12 @@ class SuffixPlurals {
                 this.groups.add(groupId(plural));
         }
     }
-    /** The plural form a key stands for, if its stem is a plural group in the base. */
+    // Undefined when the key's stem is not a plural group
     of(key) {
         const plural = parse$3(key);
         return plural && this.groups.has(groupId(plural)) ? plural : undefined;
     }
-    /** The forms of a group that a locale has, by category. */
+    // Category -> key
     forms(locale, plural) {
         const found = new Map();
         for (const category of PLURAL_CATEGORIES) {
@@ -71269,7 +71285,6 @@ class SuffixPlurals {
         }
         return found;
     }
-    /** Every group in the base, once. */
     stems(base) {
         const seen = new Map();
         for (const key of base.entries.keys()) {
@@ -71281,15 +71296,11 @@ class SuffixPlurals {
         return [...seen.values()];
     }
 }
-/** The key of one form of a group: `cart.items` and `few` give `cart.items_few`. */
+// `cart.items` + `few` -> `cart.items_few`
 function keyFor(plural, category) {
     return `${plural.stem}_${plural.ordinal ? 'ordinal_' : ''}${category}`;
 }
-/**
- * The base key to compare a plural form with: the same form when the base has
- * it, otherwise its `other` form (Arabic `items_few` against English
- * `items_other`), otherwise any form the base has.
- */
+// The same form, else `other`, else any form the base has
 function baseKeyFor(base, plural) {
     const candidates = [plural.category, 'other', ...PLURAL_CATEGORIES];
     for (const category of candidates) {
@@ -71299,7 +71310,7 @@ function baseKeyFor(base, plural) {
     }
     return keyFor(plural, 'other');
 }
-/** The forms a locale needs, or undefined when its code is not a known locale. */
+// Undefined for an unknown locale code
 function neededForms(code, ordinal) {
     const locale = intlLocale(code);
     return locale ? requiredCategories(locale, ordinal) : undefined;
@@ -71333,10 +71344,7 @@ function createContext(project, format, ignoreValues = []) {
         plurals: format === 'json' ? new SuffixPlurals(base) : undefined
     };
 }
-/**
- * The base entry a key is compared with: the same key, or for an i18next plural
- * form the base lacks (Arabic `items_few`), the base `other` form.
- */
+// The same key, or the base `other` form for a plural form the base lacks
 function baseEntryFor({ base, plurals }, key) {
     const same = base.entries.get(key);
     if (same)
@@ -71344,7 +71352,7 @@ function baseEntryFor({ base, plurals }, key) {
     const plural = plurals?.of(key);
     return plural ? base.entries.get(baseKeyFor(base, plural)) : undefined;
 }
-/** The namespace a key belongs to in a locale: the longest file namespace that prefixes it. */
+// The longest file namespace that prefixes the key
 function namespaceOf(locale, key) {
     let best = '';
     for (const { namespace } of locale.files) {
@@ -71359,10 +71367,7 @@ function namespaceOf(locale, key) {
 function isBroken(locale, key) {
     return locale.brokenNamespaces.has(namespaceOf(locale, key));
 }
-/**
- * The file a key should live in for a locale. Falls back to the base file's
- * path with the locale code swapped, for namespace files that do not exist yet.
- */
+// Falls back to the base file's path with the locale swapped, for files not created yet
 function expectedFile(target, base, key) {
     const namespace = namespaceOf(base, key);
     const existing = target.files.find((file) => file.namespace === namespace);
@@ -71373,7 +71378,7 @@ function expectedFile(target, base, key) {
         ? swapLocale(baseFile.path, base.code, target.code)
         : (target.files[0]?.path ?? '');
 }
-/** Where to point an annotation for a key that does not exist: its closest existing parent. */
+// The closest existing parent of a missing key
 function anchorFor(locale, key) {
     const parts = key.split('.');
     for (let length = parts.length - 1; length > 0; length--) {
@@ -71394,10 +71399,7 @@ function swapLocale(path, from, to) {
         .join('/');
 }
 
-/**
- * A vue-i18n linked message (`@:common.save`) points to a key that does not
- * exist in the same locale, so the message renders broken.
- */
+// `@:common.save` pointing to a key the locale does not have
 const brokenLinkedMessages = ({ format, base, targets, describe }) => {
     if (format !== 'vue-i18n')
         return [];
@@ -71424,7 +71426,7 @@ const brokenLinkedMessages = ({ format, base, targets, describe }) => {
     return issues;
 };
 
-/** A key exists but its value is empty or only whitespace. Checked in every locale. */
+// Checked in every locale, the base included
 const emptyValues = ({ base, targets }) => {
     const issues = [];
     for (const locale of [base, ...targets]) {
@@ -71448,11 +71450,7 @@ const emptyValues = ({ base, targets }) => {
     return issues;
 };
 
-/**
- * A key exists in a locale but not in the base locale (usually removed or
- * misspelled). i18next plural forms the base lacks (Arabic `items_few`) are
- * part of a group the base has, so they are not extra.
- */
+// i18next plural forms the base lacks (Arabic `items_few`) are not extra
 const extraKeys = ({ base, targets, plurals }) => {
     const issues = [];
     for (const target of targets) {
@@ -71461,6 +71459,7 @@ const extraKeys = ({ base, targets, plurals }) => {
                 continue;
             if (isBroken(base, key) || isBroken(target, key))
                 continue;
+            const meant = meantKey(key, base, target);
             issues.push({
                 check: 'extra-keys',
                 severity: 'warning',
@@ -71470,17 +71469,54 @@ const extraKeys = ({ base, targets, plurals }) => {
                 line: entry.line,
                 column: entry.column,
                 message: `Key \`${key}\` does not exist in ${base.code}`,
+                hint: meant ? `Did you mean \`${meant}\`?` : undefined,
                 isNew: true
             });
         }
     }
     return issues;
 };
+// A missing base key in other letter case, or with one path segment misspelled
+function meantKey(key, base, target) {
+    const parts = key.toLowerCase().split('.');
+    const matches = [];
+    for (const baseKey of base.entries.keys()) {
+        if (target.entries.has(baseKey))
+            continue;
+        const other = baseKey.toLowerCase().split('.');
+        if (other.length !== parts.length)
+            continue;
+        const differing = parts.flatMap((part, i) => (part === other[i] ? [] : [i]));
+        if (differing.length === 0)
+            return baseKey;
+        const [i] = differing;
+        if (differing.length === 1 && i !== undefined) {
+            if (isTypo(parts[i], other[i]))
+                matches.push(baseKey);
+        }
+    }
+    return matches.length === 1 ? matches[0] : undefined;
+}
+// Long enough that a small difference is not chance
+function isTypo(a, b) {
+    const shorter = Math.min(a.length, b.length);
+    if (shorter < 4)
+        return false;
+    return editDistance(a, b) <= (shorter >= 8 ? 2 : 1);
+}
+function editDistance(a, b) {
+    let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+        const current = [i];
+        for (let j = 1; j <= b.length; j++) {
+            current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        }
+        previous = current;
+    }
+    return previous[b.length];
+}
 
-/**
- * A message the i18n library cannot compile. vue-i18n and next-intl
- * fail at runtime on these, so they are errors in every locale.
- */
+// The library fails on these at runtime, so they are errors in every locale
 const invalidSyntax = ({ base, targets, describe }) => {
     const issues = [];
     for (const locale of [base, ...targets]) {
@@ -71505,14 +71541,7 @@ const invalidSyntax = ({ base, targets, describe }) => {
     return issues;
 };
 
-/**
- * A key exists in the base locale but not in another locale.
- *
- * An i18next plural group counts as one message: when a locale has some of its
- * forms, the plural-forms check says which are missing. When it has none, the
- * missing keys are the forms that locale needs (six for Arabic, one for
- * Japanese), not the base's forms.
- */
+// An i18next plural group with no forms needs the forms of the locale, not the base
 const missingKeys = (context) => {
     const { base, targets, plurals } = context;
     const issues = [];
@@ -71563,18 +71592,7 @@ function missing(target, base, key, baseEntry) {
     };
 }
 
-/**
- * The placeholders of a translation differ from the base message.
- * Messages that cannot be parsed are left to the invalid-syntax check.
- *
- * vue-i18n linked messages (`@:key`) are not compared: translators often write
- * the text instead of linking, to fit the grammar of their language, and a link
- * to a wrong key is reported by broken-linked-messages.
- *
- * i18next plural forms are compared with the same form in the base, or its
- * `other` form, and may leave out the count: "منتج واحد" ("one item") is a
- * correct Arabic `_one` form.
- */
+// Linked messages are skipped: translators often write the text instead
 const placeholderMismatch = (context) => {
     const { targets, describe, plurals } = context;
     const issues = [];
@@ -71615,7 +71633,7 @@ const placeholderMismatch = (context) => {
     }
     return issues;
 };
-/** The count of an i18next plural, which a form may write out in words. */
+// A plural form may write the count out in words
 const COUNT = new Set(['{{count}}', '{count}']);
 function isComparable(placeholder) {
     return !placeholder.startsWith('@:');
@@ -71624,23 +71642,9 @@ function list$1(placeholders) {
     return placeholders.map((p) => `\`${p}\``).join(', ');
 }
 
-/** `=0`, `=1` and `=2` cover the categories that only contain that number. */
+// `=0`, `=1` and `=2` cover categories that hold only that number
 const EXACT = { '=0': 'zero', '=1': 'one', '=2': 'two' };
-/**
- * Plural messages that miss forms the language needs.
- *
- * ICU (next-intl): the forms come from `Intl.PluralRules`, so every language
- * works without hand-written tables. A missing `other` is an error, since ICU
- * requires it.
- *
- * Plain JSON (i18next): each form is its own key (`items_one`, `items_few`),
- * checked against the same rules. A missing `other` is an error, since
- * i18next falls back to it for every count without its own form.
- *
- * vue-i18n is not checked. Its plurals are `|` branches whose count depends
- * on custom rules, and a single branch is often correct ("{count} mois" in
- * French, "{count} ay" in Turkish), so a real project showed only false alarms.
- */
+// vue-i18n is skipped: a single `|` branch is often correct, e.g. French "{count} mois"
 const pluralForms = (context) => context.format === 'next-intl'
     ? icuPlurals(context)
     : context.format === 'json'
@@ -71672,7 +71676,7 @@ function icuPlurals({ base, targets, describe }) {
     }
     return issues;
 }
-/** i18next plural groups: one issue per group and locale that misses forms. */
+// One issue per group and locale
 function suffixPlurals({ base, targets, plurals }) {
     if (!plurals)
         return [];
@@ -71681,7 +71685,7 @@ function suffixPlurals({ base, targets, plurals }) {
         const code = intlLocale(locale.code);
         for (const plural of plurals.stems(base)) {
             const forms = plurals.forms(locale, plural);
-            // A group with no form at all is reported by missing-keys.
+            // A group with no form at all is reported by missing-keys
             const needed = neededForms(locale.code, plural.ordinal);
             if (forms.size === 0 || !code || !needed)
                 continue;
@@ -71715,7 +71719,7 @@ function issue$1(locale, key, entry, details) {
     };
 }
 
-/** Languages written in a script other than Latin, with the letters of that script. */
+// Non-Latin scripts and their letters
 const SCRIPTS = {
     ar: { name: 'Arabic', letters: /\p{Script=Arabic}/u },
     fa: { name: 'Persian', letters: /\p{Script=Arabic}/u },
@@ -71747,20 +71751,15 @@ const SCRIPTS = {
 };
 const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g;
 const LETTER = /\p{L}/u;
-/** Letters plus combining marks, so Hindi or vowelled Arabic words stay whole; "E-mail" is one word. */
-const WORD = /[\p{L}\p{M}]+(?:[-'’][\p{L}\p{M}]+)*/gu;
-/** Words that carry meaning, so date formats like "H:mm:ss" are not counted as text. */
+// e.g. comments.xlsx, usually the same in every language
+const FILE_NAME = /^[^\s/\\]+\.(?:csv|docx?|gif|jpe?g|json|pdf|png|pptx?|svg|txt|webp|xlsx?|xml|zip)$/i;
+// Skips date formats like "H:mm:ss"
 const LONG_WORD = /[\p{L}\p{M}]{3,}/gu;
-/**
- * Languages close enough that whole sentences are often written the same way
- * ("Generar Factura" in Spanish and Catalan), or that share characters
- * ("API Key 管理" in Chinese and Japanese). Values shared inside a group are
- * not reported by the cross-locale rule.
- */
+// Close languages that often share whole sentences or characters
 const RELATED_LANGUAGES = [
     ['zh', 'ja'],
     ['no', 'nb', 'nn', 'da'],
-    ['es', 'ca', 'gl', 'pt', 'ast'],
+    ['es', 'ca', 'gl', 'pt', 'ast', 'it'],
     ['tr', 'az'],
     ['sr', 'hr', 'bs', 'sh', 'cnr'],
     ['cs', 'sk'],
@@ -71770,20 +71769,8 @@ const RELATED_LANGUAGES = [
     ['fa', 'prs'],
     ['nl', 'af']
 ];
-/** A pair of locales must share at least this many different values to be reported. */
 const MIN_SHARED_VALUES = 2;
-/**
- * Text that was probably never translated.
- *  - identical to the base value, with at least two words (skipped between
- *    variants of one language, e.g. en and en-GB)
- *  - for non-Latin languages, no letter of that language's script at all
- *  - identical in two other locales, e.g. Turkish text pasted into the
- *    French file (see `sharedValues`)
- *
- * Single words are left out of the identical rules: on a real project most of
- * them were brands or words that are the same in both languages ("Total",
- * "Chat", "Premium"). Brand names in non-Latin locales belong in `ignore-values`.
- */
+// Same as the base, no letter of the locale's script, or copied between locales
 const untranslated = (context) => [
     ...perValue(context),
     ...sharedValues(context)
@@ -71801,13 +71788,17 @@ const perValue = (context) => {
             const value = entry.value.trim();
             if (!baseEntry || !value || ignored.has(value.toLowerCase()))
                 continue;
+            if (FILE_NAME.test(value))
+                continue;
             const text = visibleText(describe, entry.value);
             if (text === undefined || !LETTER.test(text))
                 continue;
+            // Plurals count one branch: `ticket | tickets` is one word
+            const shown = describe(entry.value).longestText?.replace(URL_OR_EMAIL, ' ') ?? text;
             let message;
             if (language !== baseLanguage &&
                 value === baseEntry.value.trim() &&
-                wordCount(text) >= 2) {
+                wordCount(shown) >= 2) {
                 message = `\`${key}\`: same text as ${base.code}`;
             }
             else if (script && !script.letters.test(text)) {
@@ -71831,17 +71822,7 @@ const perValue = (context) => {
     }
     return issues;
 };
-/**
- * Two locales of unrelated languages that hold the same text for the same keys,
- * while the base says something else: one file was copied into the other. A
- * real project had 22 Turkish values in its French file.
- *
- * One issue per pair of locales, with the keys as details, because it is one
- * mistake. It is attached to the first locale of the pair by name, since the
- * tool cannot tell which file is the wrong one. The message and key leave out
- * the count and the keys, so the issue stays "existing" when a pull
- * request translates some of the values.
- */
+// One issue per locale pair, without counts, so partial fixes keep it existing
 const sharedValues = ({ base, targets, describe, ignoreValues }) => {
     const ignored = ignoredSet(ignoreValues);
     const issues = [];
@@ -71893,13 +71874,10 @@ function related(a, b) {
     return (first === second ||
         RELATED_LANGUAGES.some((group) => group.includes(first) && group.includes(second)));
 }
-/** The text a user reads, without placeholders, URLs or emails; undefined if the message is broken. */
+// Undefined when the message is broken
 function visibleText(describe, value) {
     const info = describe(value);
     return info.error ? undefined : info.text.replace(URL_OR_EMAIL, ' ');
-}
-function wordCount(text, pattern = WORD) {
-    return text.match(pattern)?.length ?? 0;
 }
 function ignoredSet(values) {
     return new Set(values.map((value) => value.trim().toLowerCase()));
@@ -71916,7 +71894,7 @@ const checks = {
     'plural-forms': pluralForms
 };
 
-/** Runs every enabled check on a loaded project. Never touches files or GitHub. */
+// Pure: never touches files or GitHub
 function analyze(project, options) {
     const disabled = new Set(options.disabledChecks ?? []);
     const issues = disabled.has('parse-error') ? [] : [...project.parseErrors];
@@ -71934,7 +71912,7 @@ function analyze(project, options) {
         ? issues.filter((issue) => !issue.key || !ignoreKeys(issue.key))
         : issues);
 }
-/** Errors first, then by locale, file and line. */
+// Errors first, then by locale, file and line
 function sortIssues(issues) {
     return [...issues].sort((a, b) => rank(a) - rank(b) ||
         a.locale.localeCompare(b.locale) ||
@@ -71943,11 +71921,7 @@ function sortIssues(issues) {
         compareKeys(a.key, b.key));
 }
 const PLURAL_FORM = new RegExp(`^(.+_(?:ordinal_)?)(${PLURAL_CATEGORIES.join('|')})$`);
-/**
- * Alphabetical, except that plural forms of one key keep their natural order:
- * `items_zero`, `items_one`, `items_two`, `items_few`, `items_many`,
- * `items_other`.
- */
+// Alphabetical, but plural forms of one key keep CLDR order (zero … other)
 function compareKeys(a, b) {
     const pluralA = PLURAL_FORM.exec(a);
     const pluralB = PLURAL_FORM.exec(b);
@@ -71961,18 +71935,10 @@ function rank(issue) {
     return issue.severity === 'error' ? 0 : 1;
 }
 
-/**
- * Identifies "the same issue" on two branches. The file path and line are left
- * out on purpose: moving a key or adding lines above it must not turn an old
- * issue into a new one.
- */
+// File and line are left out, so moving a key does not make an old issue new
 function fingerprint(issue) {
     return [issue.check, issue.locale, issue.key, issue.message].join('\u0000');
 }
-/**
- * Marks each issue of the pull request as new, or as existing when the
- * same issue is already on the base branch.
- */
 function markNew(head, base) {
     const existing = new Set(base.map(fingerprint));
     return head.map((issue) => ({
@@ -84678,16 +84644,7 @@ const stringbool = (...args) => _stringbool({
     String: ZodString,
 }, ...args);
 
-/**
- * File patterns use `{locale}` where the locale code appears in the path:
- *
- *   locales/{locale}.json         -> locales/ar.json            (locale "ar")
- *   locales/{locale}/*.json       -> locales/ar/checkout.json   (locale "ar", namespace "checkout")
- *   locales/{locale}/**\/*.yml    -> locales/ar/admin/users.yml (locale "ar", namespace "admin.users")
- *
- * A `*` in the file name or in a folder becomes part of the namespace, so every
- * key in that file is prefixed with it.
- */
+// A `*` in the path becomes the namespace: `locales/{locale}/*.json`
 const LOCALE = '{locale}';
 function validatePattern(pattern) {
     const count = pattern.split(LOCALE).length - 1;
@@ -84697,7 +84654,7 @@ function validatePattern(pattern) {
         return `Pattern "${pattern}" must contain ${LOCALE} only once`;
     return undefined;
 }
-/** Turns a pattern into a glob that finds every locale. */
+// Matches every locale
 function toGlob(pattern) {
     return normalize(pattern).replace(LOCALE, '*');
 }
@@ -84734,7 +84691,7 @@ function compile(pattern) {
             i += 3;
         }
         else if (pattern[i] === '*') {
-            // A star right after a dot is a file extension, not a namespace.
+            // A star right after a dot is a file extension, not a namespace
             if (pattern[i - 1] === '.') {
                 source += '[^/]+';
             }
@@ -84768,11 +84725,7 @@ const CHECK_IDS = [
     'untranslated',
     'plural-forms'
 ];
-/**
- * The `format` setting names the library that reads the messages. Libraries
- * that share a message syntax share a format: react-intl writes ICU messages
- * just like next-intl, and react-i18next writes plain JSON.
- */
+// Libraries that share a message syntax share a format
 const FORMATS = {
     'vue-i18n': 'vue-i18n',
     '@nuxtjs/i18n': 'vue-i18n',
@@ -84787,10 +84740,7 @@ const FORMATS = {
     'next-i18next': 'json',
     'i18next-vue': 'json'
 };
-/**
- * A framework can use more than one library, and each writes messages its own
- * way, so a framework name is answered with the libraries to choose from.
- */
+// A framework name is answered with the libraries it can use
 const FRAMEWORKS = {
     nuxt: '@nuxtjs/i18n',
     vue: 'vue-i18n or i18next-vue',
@@ -84802,6 +84752,14 @@ const list = union([array(string()), string()])
     .transform((value) => (Array.isArray(value) ? value : value.split(/[\n,]/))
     .map((item) => item.trim())
     .filter(Boolean));
+// A line can hold commas ("Visa, Mastercard, Amex"), so it is kept whole and split
+const valueList = union([array(string()), string()])
+    .transform((value) => {
+    const values = Array.isArray(value)
+        ? value
+        : value.split('\n').flatMap((line) => [line, ...line.split(',')]);
+    return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
+});
 const flag = union([boolean(), stringbool()]);
 const configSchema = strictObject({
     format: string()
@@ -84822,17 +84780,15 @@ const configSchema = strictObject({
     }),
     'fail-on': _enum(['error', 'warning', 'never']).default('error'),
     'fail-on-existing': flag.default(false),
+    'check-when': _enum(['locale-changes', 'always']).default('locale-changes'),
     comment: flag.default(true),
     annotations: flag.default(true),
     'ignore-keys': list.default([]),
     'ignore-locales': list.default([]),
-    'ignore-values': list.default([]),
+    'ignore-values': valueList.default([]),
     'disable-checks': list.pipe(array(_enum(CHECK_IDS))).default([])
 });
-/**
- * Validates the settings and fills in defaults. Settings come from the
- * optional config file and from action inputs; an input that was set wins.
- */
+// An input that was set wins over the config file
 function parseConfig(inputs, file) {
     const fromInputs = Object.fromEntries(Object.entries(inputs).filter(([, value]) => value !== undefined && value !== ''));
     const merged = { ...file?.values, ...fromInputs };
@@ -84863,7 +84819,7 @@ function parseConfig(inputs, file) {
         })
     };
 }
-/** Reads `.localeguard.yml`. Returns an error message when it is not a YAML map. */
+// Returns an error message when the file is not a YAML map
 function readConfigFile(path, text) {
     try {
         const values = parse$2(text);
@@ -86648,7 +86604,7 @@ function printParseErrorCode(code) {
     return '<unknown ParseErrorCode>';
 }
 
-/** Maps character offsets to 1-based line and column numbers. */
+// Character offsets to 1-based line and column
 class LineIndex {
     starts = [0];
     constructor(text) {
@@ -86679,11 +86635,7 @@ function scalarToString(value) {
     return String(value);
 }
 
-/**
- * Parses a JSON locale file and keeps the line and column of every key.
- * Comments and trailing commas are reported as errors, because the apps that
- * load these files use strict JSON.
- */
+// Comments and trailing commas are errors: apps load these files as strict JSON
 function parseJson(text) {
     const lines = new LineIndex(text);
     const errors = [];
@@ -86771,7 +86723,6 @@ function describe(code) {
     return `Invalid JSON: ${messages[code] ?? code}`;
 }
 
-/** Parses a YAML locale file and keeps the line and column of every key. */
 function parseYaml(text) {
     const lineCounter = new LineCounter();
     const doc = parseDocument(text, { lineCounter, prettyErrors: false });
@@ -86825,7 +86776,7 @@ function parseYaml(text) {
             });
         }
     };
-    // An empty file, or one with only `---` or comments: a locale with no keys yet.
+    // An empty file, or one with only `---` or comments: a locale with no keys yet
     const contents = doc.contents;
     if (contents === null || (isScalar(contents) && contents.value === null)) {
         return { ok: true, entries, nodes };
@@ -86853,7 +86804,7 @@ function localFileSource(root) {
         read: (path) => readFile(join(root, path), 'utf8')
     };
 }
-/** A source built from a known list of paths, e.g. a git tree or an in-memory map in tests. */
+// From a known list of paths, e.g. a git tree or an in-memory map in tests
 function listFileSource(paths, read) {
     return {
         glob: async (patterns) => {
@@ -86873,7 +86824,7 @@ async function loadProject(source, options) {
             const match = matchPattern(pattern, path);
             if (!match || ignored.has(match.locale))
                 continue;
-            // e.g. locales/vee-validate-ur.json next to the real locale files.
+            // e.g. locales/vee-validate-ur.json next to the real locale files
             if (!intlLocale(match.locale)) {
                 skipped.push(path);
                 continue;
@@ -86954,7 +86905,6 @@ function parse(path, raw) {
     return /\.ya?ml$/i.test(path) ? parseYaml(text) : parseJson(text);
 }
 
-/** Decides whether the check fails. */
 function decide(issues, options) {
     if (options.failOn === 'never')
         return { failed: false, blocking: [] };
@@ -86963,12 +86913,8 @@ function decide(issues, options) {
     return { failed: blocking.length > 0, blocking };
 }
 
-/**
- * GitHub shows at most 10 error and 10 warning annotations per step, so new
- * issues come first and the rest are counted in a single notice.
- */
+// GitHub shows 10 per severity per step, so new issues go first
 const ANNOTATIONS_PER_SEVERITY = 10;
-/** Marks issues on their line in the "Files changed" tab. */
 function annotate(issues, baseLocale, sink = core) {
     const ordered = [
         ...issues.filter((issue) => issue.isNew),
@@ -86989,7 +86935,10 @@ function annotate(issues, baseLocale, sink = core) {
     }
 }
 function message(issue, baseLocale) {
-    const plain = issue.message.replace(/`/g, '');
+    const plain = [issue.message, issue.hint]
+        .filter(Boolean)
+        .join('. ')
+        .replace(/`/g, '');
     return issue.baseValue !== undefined
         ? `${plain}\n${baseLocale}: ${issue.baseValue}`
         : plain;
@@ -87003,7 +86952,6 @@ function properties(issue) {
     };
 }
 
-/** Hidden marker that identifies the Locale Guard comment on a pull request. */
 const MARKER = '<!-- locale-guard -->';
 const LABELS = {
     'parse-error': ['file could not be parsed', 'files could not be parsed'],
@@ -87025,7 +86973,8 @@ function renderReport(input) {
     const limit = (input.maxLength ?? Infinity) - RESERVED;
     let body = `${MARKER}\n${title(fresh, existing)}\n`;
     if (input.hasBaseline && input.issues.length > 0) {
-        body += `\nNew in this PR: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ' (collapsed below)' : ''}\n`;
+        const where = input.existing === 'open' ? 'listed below' : 'collapsed below';
+        body += `\nNew in this PR: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ` (${where})` : ''}\n`;
     }
     let omitted = 0;
     for (const group of mergeMissingKeys(groupIssues(fresh))) {
@@ -87039,7 +86988,8 @@ function renderReport(input) {
         body += `\n${existingCounts(existing, input.summaryUrl)}`;
     }
     else if (existing.length > 0) {
-        let details = `\n<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`;
+        const open = input.existing === 'open' ? ' open' : '';
+        let details = `\n<details${open}><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`;
         for (const group of groupIssues(existing)) {
             const section = `\n${renderGroup(group, input, '####')}`;
             if (body.length + details.length + section.length > limit) {
@@ -87051,7 +87001,7 @@ function renderReport(input) {
         body += `${details}\n</details>\n`;
     }
     if (omitted > 0) {
-        // Without a summary link this is the job summary itself, which has nowhere else to point.
+        // Without a summary link, this is the job summary itself
         const rest = input.summaryUrl
             ? `, see the [job summary](${input.summaryUrl})`
             : ' not shown, because this page reached its size limit';
@@ -87104,11 +87054,7 @@ function groupIssues(issues) {
         a.locale.localeCompare(b.locale) ||
         CHECK_ORDER.indexOf(a.check) - CHECK_ORDER.indexOf(b.check));
 }
-/**
- * A new key added to the base locale is usually missing in every other locale
- * at once. Instead of repeating the same table for each locale, locales that
- * miss exactly the same keys share one section.
- */
+// Locales that miss exactly the same keys share one section
 function mergeMissingKeys(groups) {
     const merged = [];
     const bySignature = new Map();
@@ -87154,7 +87100,8 @@ function renderGroup(group, input, heading) {
     else {
         for (const issue of group.issues) {
             const where = location(issue, input);
-            out += `- ${issue.message}${where ? ` · ${where}` : ''}\n`;
+            const hint = issue.hint ? `. ${issue.hint}` : '';
+            out += `- ${issue.message}${hint}${where ? ` · ${where}` : ''}\n`;
             if (issue.details?.length) {
                 const lines = issue.details.map((line) => `  - ${cell(line)}`);
                 out += `  <details><summary>${count(issue.details.length, 'key', 'keys')}</summary>\n\n${lines.join('\n')}\n\n  </details>\n`;
@@ -87163,7 +87110,7 @@ function renderGroup(group, input, heading) {
     }
     return out;
 }
-/** One table for keys that are missing in several locales, linked to the base file. */
+// Links point to the base file
 function renderSharedMissingKeys(group, input, heading) {
     const { project } = input;
     const base = project.locales.get(project.baseLocale);
@@ -87183,7 +87130,7 @@ function renderSharedMissingKeys(group, input, heading) {
     }
     return out;
 }
-/** `locales/ar/common.json` becomes `locales/{locale}/common.json`. */
+// `locales/ar/common.json` -> `locales/{locale}/common.json`
 function withLocalePlaceholder(path, locale) {
     return path
         .split('/')
@@ -87200,12 +87147,7 @@ function location(issue, input) {
     const url = input.link?.(issue.file, issue.line);
     return url ? `[${label}](${url})` : label;
 }
-/**
- * A missing key links to its parent object in the locale file, where it should
- * be added. When the locale has no such parent (a flat key, a new group, or a
- * namespace file the locale never got), the link would only reach the top of a
- * file, so it points to the key in the base file instead.
- */
+// Links to the parent object in the locale file, or to the base key when it has none
 function missingKeyLink(issue, input) {
     const { project } = input;
     const label = `\`${issue.key}\``;
@@ -87219,7 +87161,7 @@ function missingKeyLink(issue, input) {
         : input.link?.(issue.file, issue.line);
     return url ? `[${label}](${url})` : label;
 }
-/** Whether an object that contains the key exists in the locale, below its namespace. */
+// Only parents inside the key's namespace count
 function hasParent(locale, key) {
     const namespace = namespaceOf(locale, key);
     const parts = key.split('.');
@@ -87232,12 +87174,11 @@ function hasParent(locale, key) {
     }
     return false;
 }
-/** The base entry of a key, or of its `other` form for a plural form the base lacks. */
+// Falls back to the `other` form for a plural form the base lacks
 function baseEntryOf(base, key) {
     return (base?.entries.get(key) ??
         base?.entries.get(key.replace(PLURAL_SUFFIX, '_$1other')));
 }
-/** Ready-to-paste nested object with the missing keys and empty values, one block per file. */
 function copyPaste(issues, project) {
     let out = '';
     for (const [file, fileIssues] of byFile(issues)) {
@@ -87255,11 +87196,7 @@ function copyPasteBlock(summary, file, issues, project) {
     const code = yaml ? stringify(tree).trimEnd() : JSON.stringify(tree, null, 2);
     return `\n<details><summary>📋 ${summary}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`;
 }
-/**
- * A key as written inside its file, without the file's namespace. Keys the base
- * lacks (an i18next plural form only Arabic needs) take the namespace off the
- * same way.
- */
+// The key without its file's namespace
 function keyInFile(base, key) {
     const entry = base?.entries.get(key);
     if (entry)
@@ -87267,13 +87204,7 @@ function keyInFile(base, key) {
     const namespace = base ? namespaceOf(base, key) : '';
     return namespace ? key.slice(namespace.length + 1) : key;
 }
-/**
- * A key's segments as the base file writes them, so a flat file
- * (`"cart.title": ""`, as react-intl expects) gets a flat key back. A key the
- * base lacks (an i18next plural form only Arabic needs) is shaped like the
- * base key that shares the longest parent with it: `cart.items_few` next to
- * `cart.items_other`.
- */
+// Segments as the base file writes them, so a flat file gets flat keys back
 function pathInFile(base, key) {
     const entry = base?.entries.get(key);
     if (entry)
@@ -87330,13 +87261,7 @@ function count(n, singular, plural) {
     return `${n} ${n === 1 ? singular : plural}`;
 }
 
-/**
- * Keeps a single Locale Guard comment per pull request. It finds the
- * comment by its hidden marker and edits it, so every run updates the same one.
- *
- * A new comment is only created when `createIfMissing` is set, so a clean pull
- * request gets no comment at all.
- */
+// Edits the comment with the marker; creates one only when `createIfMissing` is set
 async function upsertComment(octokit, repo, issueNumber, body, options) {
     try {
         const existing = await findComment(octokit, repo, issueNumber);
@@ -87361,7 +87286,7 @@ async function upsertComment(octokit, repo, issueNumber, body, options) {
         return { status: 'created', url: data.html_url };
     }
     catch (error) {
-        // Read-only tokens (forks, Dependabot) or missing `pull-requests: write`.
+        // Read-only tokens (forks, Dependabot) or missing `pull-requests: write`
         const status = error.status;
         if (status === 403 || status === 404) {
             return {
@@ -87372,7 +87297,6 @@ async function upsertComment(octokit, repo, issueNumber, body, options) {
         throw error;
     }
 }
-/** The Locale Guard comment on a pull request, found by its hidden marker. */
 async function findComment(octokit, repo, issueNumber) {
     const comments = await octokit.paginate(octokit.rest.issues.listComments, {
         ...repo,
@@ -87402,22 +87326,14 @@ function readRunContext(context$1 = context) {
             : undefined
     };
 }
-/** Builds links to a line of a file at a commit. */
 function lineLinker(run, sha) {
     const root = `${run.serverUrl}/${run.repo.owner}/${run.repo.repo}/blob/${sha}`;
     return (file, line) => `${root}/${file.split('/').map(encodeURIComponent).join('/')}${line ? `#L${line}` : ''}`;
 }
 
-/** Parallel blob downloads, kept low to stay clear of GitHub's secondary rate limits. */
+// Kept low to avoid GitHub's secondary rate limits
 const CONCURRENCY = 8;
-/**
- * Reads the locale files of the base branch through the API, so users do
- * not need `fetch-depth: 0` in actions/checkout.
- *
- * Only the folders the patterns can match are listed (e.g. `locales/` for
- * `locales/{locale}.json`), which keeps large repositories fast and avoids the
- * size limit of a recursive tree of the whole repo.
- */
+// Through the API, so users need no `fetch-depth: 0` in actions/checkout
 async function baseFileSource(octokit, repo, sha, patterns) {
     const blobs = new Map();
     for (const dir of rootDirs(patterns)) {
@@ -87447,7 +87363,7 @@ async function baseFileSource(octokit, repo, sha, patterns) {
         return Buffer.from(data.content, data.encoding === 'base64' ? 'base64' : 'utf8').toString('utf8');
     }));
 }
-/** The fixed folders at the start of each pattern, without folders nested in another one. */
+// Fixed leading folders, without folders nested in another one
 function rootDirs(patterns) {
     const dirs = patterns.map((pattern) => {
         const segments = toGlob(pattern).split('/');
@@ -87492,7 +87408,7 @@ function limiter(max) {
         }
     };
 }
-/** Every file the pull request touches, including the old name of renamed files. */
+// Renamed files count with their old name too
 async function listChangedFiles(octokit, repo, pullNumber) {
     const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
         ...repo,
@@ -87503,20 +87419,19 @@ async function listChangedFiles(octokit, repo, pullNumber) {
         ? [file.filename, file.previous_filename]
         : [file.filename]);
 }
-/** Whether any changed file is a locale file or the config file. */
+// The config file counts too
 function touchesLocales(changed, patterns, extraFiles = []) {
     const isLocale = picomatch(patterns.map(toGlob));
     return changed.some((file) => isLocale(file) || extraFiles.includes(file));
 }
 
-/** GitHub caps each step summary at 1 MiB. */
+// GitHub caps each step summary at 1 MiB
 const SUMMARY_LIMIT = 1_000_000;
-/** Writes the full report to the job summary page. */
 async function writeSummary(markdown, summary$1 = summary) {
     await summary$1.addRaw(markdown, true).write();
 }
 
-/** GitHub rejects comments longer than 65,536 characters. */
+// GitHub rejects comments over 65,536 characters
 const COMMENT_LIMIT = 65_000;
 const INPUTS = [
     'format',
@@ -87524,6 +87439,7 @@ const INPUTS = [
     'files',
     'fail-on',
     'fail-on-existing',
+    'check-when',
     'comment',
     'annotations',
     'ignore-keys',
@@ -87556,8 +87472,10 @@ async function check(config, workspace, configPath) {
     const token = getInput('github-token');
     const octokit = token ? getOctokit(token) : undefined;
     const pr = context.pullRequest;
-    // Leave quickly when the pull request does not touch translations.
-    if (pr &&
+    // Leave early when no locale file changed, unless check-when is always
+    const always = config['check-when'] === 'always';
+    if (!always &&
+        pr &&
         octokit &&
         (await skipPullRequest(octokit, context, config, configPath))) {
         info('No locale files changed in this pull request. Nothing to check.');
@@ -87585,7 +87503,7 @@ async function check(config, workspace, configPath) {
     const report = { issues, project, hasBaseline, link };
     await writeSummary(renderReport({ ...report, maxLength: SUMMARY_LIMIT }));
     if (config.annotations) {
-        // With a baseline, old issues are not annotated: they are not this PR's doing.
+        // Old issues are not this PR's doing, so they are not annotated
         annotate(hasBaseline ? issues.filter((issue) => issue.isNew) : issues, baseLocale);
     }
     if (config.comment && pr && octokit) {
@@ -87593,8 +87511,11 @@ async function check(config, workspace, configPath) {
             ...report,
             maxLength: COMMENT_LIMIT,
             summaryUrl: context.runUrl,
-            existing: 'counts'
-        }), issues);
+            // check-when: always lists old issues open
+            existing: always ? 'open' : 'counts'
+        }), 
+        // A new comment for new issues, or for any issue with check-when: always
+        always ? issues.length > 0 : issues.some((issue) => issue.isNew));
     }
     const verdict = decide(issues, {
         failOn: config['fail-on'],
@@ -87610,10 +87531,7 @@ async function check(config, workspace, configPath) {
             : 'All translations are in sync.');
     }
 }
-/**
- * Runs the same checks on the base branch. Returns undefined when the base
- * cannot be read, so every issue is treated as new instead of failing the run.
- */
+// Undefined when the base cannot be read, so every issue counts as new
 async function analyzeBase(octokit, context, config) {
     const pr = context.pullRequest;
     if (!pr)
@@ -87643,7 +87561,7 @@ function analyzeOptions(config) {
         ignoreValues: config['ignore-values']
     };
 }
-/** The optional config file. Undefined when there is none, a message when it is broken. */
+// Undefined when there is none, a message when it is broken
 async function loadConfigFile(workspace, path) {
     let text;
     try {
@@ -87663,8 +87581,7 @@ async function skipPullRequest(octokit, context, config, configPath) {
         const changed = await listChangedFiles(octokit, context.repo, pr.number);
         if (touchesLocales(changed, config.files, [configPath]))
             return false;
-        // A previous run left a comment, e.g. before a fix reverted the locale
-        // changes. Run again so the comment does not show stale issues.
+        // A previous comment may show stale issues, so run again
         return !(config.comment && (await findComment(octokit, context.repo, pr.number)));
     }
     catch (error) {
@@ -87672,17 +87589,17 @@ async function skipPullRequest(octokit, context, config, configPath) {
         return false;
     }
 }
-async function comment(octokit, context, body, issues) {
+async function comment(octokit, context, body, createIfMissing) {
     const pr = context.pullRequest;
     if (!pr)
         return;
-    // A fork's token is read-only, so do not even try.
+    // A fork's token is read-only
     if (pr.isFork) {
         info('This pull request comes from a fork, and GitHub gives forks a read-only token, so Locale Guard cannot comment. The results are in the job summary and the annotations.');
         return;
     }
     const result = await upsertComment(octokit, context.repo, pr.number, body, {
-        createIfMissing: issues.some((issue) => issue.isNew)
+        createIfMissing
     });
     switch (result.status) {
         case 'created':
@@ -87698,17 +87615,14 @@ async function comment(octokit, context, body, issues) {
             break;
     }
 }
-/**
- * Lists new issues one per line. Existing issues get one count line: a large
- * project can have 100,000 of them, and the job summary already lists them.
- */
+// Existing issues get one count line: there can be 100,000 of them
 function logIssues(issues) {
     const fresh = issues.filter((issue) => issue.isNew);
     const existing = issues.length - fresh.length;
     if (fresh.length > 0) {
         startGroup(`Locale Guard: ${fresh.length} new ${fresh.length === 1 ? 'issue' : 'issues'}`);
         for (const issue of fresh) {
-            info(`${issue.severity} ${issue.locale} ${issue.file}${issue.line ? `:${issue.line}` : ''} ${issue.message.replace(/`/g, '')}`);
+            info(`${issue.severity} ${issue.locale} ${issue.file}${issue.line ? `:${issue.line}` : ''} ${[issue.message, issue.hint].filter(Boolean).join('. ').replace(/`/g, '')}`);
         }
         endGroup();
     }
@@ -87717,9 +87631,5 @@ function logIssues(issues) {
     }
 }
 
-/**
- * The entrypoint for the action. It only imports and runs the main logic,
- * so tests can import `run` without executing it.
- */
 run();
 //# sourceMappingURL=index.js.map
