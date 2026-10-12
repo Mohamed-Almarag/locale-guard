@@ -43,6 +43,7 @@ const INPUTS = [
   'files',
   'fail-on',
   'fail-on-existing',
+  'check-when',
   'comment',
   'annotations',
   'ignore-keys',
@@ -87,8 +88,11 @@ async function check(
   const octokit = token ? github.getOctokit(token) : undefined
   const pr = context.pullRequest
 
-  // Leave quickly when the pull request does not touch translations.
+  // Leave quickly when the pull request does not touch translations, unless
+  // the repo asked to see its existing issues on every pull request.
+  const always = config['check-when'] === 'always'
   if (
+    !always &&
     pr &&
     octokit &&
     (await skipPullRequest(octokit, context, config, configPath))
@@ -147,9 +151,11 @@ async function check(
         ...report,
         maxLength: COMMENT_LIMIT,
         summaryUrl: context.runUrl,
-        existing: 'counts'
+        // With check-when: always, old issues are the point, so they are listed open.
+        existing: always ? 'open' : 'counts'
       }),
-      issues
+      // A new comment is added for new issues, or for any issue with check-when: always.
+      always ? issues.length > 0 : issues.some((issue) => issue.isNew)
     )
   }
 
@@ -259,7 +265,7 @@ async function comment(
   octokit: Octokit,
   context: RunContext,
   body: string,
-  issues: Issue[]
+  createIfMissing: boolean
 ): Promise<void> {
   const pr = context.pullRequest
   if (!pr) return
@@ -273,7 +279,7 @@ async function comment(
   }
 
   const result = await upsertComment(octokit, context.repo, pr.number, body, {
-    createIfMissing: issues.some((issue) => issue.isNew)
+    createIfMissing
   })
   switch (result.status) {
     case 'created':

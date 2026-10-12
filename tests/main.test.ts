@@ -276,6 +276,30 @@ describe('run', () => {
       )
     })
 
+    it('with check-when always, lists existing issues on a pull request without locale changes and does not fail', async () => {
+      const { state } = setup({
+        inputs: { 'check-when': 'always' },
+        state: {
+          files: [{ filename: 'src/a.ts' }],
+          baseFiles: sameAsHead()
+        }
+      })
+
+      await run()
+
+      expect(core.info).not.toHaveBeenCalledWith(
+        'No locale files changed in this pull request. Nothing to check.'
+      )
+      const body = state.comments[0]?.body ?? ''
+      expect(body).toContain(
+        '✅ This pull request adds no new translation issues.'
+      )
+      expect(body).toMatch(/Already existing: \d+ \(listed below\)/)
+      expect(body).toMatch(/<details open><summary>\d+ existing issues/)
+      expect(body).toContain('#### ❌ ar: 1 missing key')
+      expect(core.setFailed).not.toHaveBeenCalled()
+    })
+
     it('fails on existing issues with fail-on-existing', async () => {
       setup({
         inputs: { 'fail-on-existing': 'true' },

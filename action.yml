@@ -35,6 +35,13 @@ inputs:
     description:
       'Also fail on issues that existed before the pull request. Default: false.'
     required: false
+  check-when:
+    description: >
+      locale-changes: check only pull requests that change locale files. always:
+      check every pull request and list the issues that already exist, so old
+      problems stay visible. They never fail the check unless fail-on-existing
+      is true. Default: locale-changes.
+    required: false
   comment:
     description:
       'Write a single pull request comment that is updated on every run.
