@@ -9,6 +9,7 @@
 # expected from the build.
 name: Check Transpiled JavaScript
 
+# main only: dist/ is rebuilt once per release, not on every branch merged into dev.
 on:
   pull_request:
     branches:
