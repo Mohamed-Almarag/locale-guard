@@ -12,7 +12,7 @@ const describers: Record<Format, (source: string) => MessageInfo> = {
   json: describePlainMessage
 }
 
-/** Returns a describer that parses each distinct message only once. */
+// Parses each distinct message once
 export function createDescriber(
   format: Format
 ): (source: string) => MessageInfo {

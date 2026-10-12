@@ -18,28 +18,25 @@ export interface Position {
   column: number
 }
 
-/** A single translated message, after flattening nested objects. */
+// One message, after flattening nested objects
 export interface Entry extends Position {
   key: string
   value: string
   file: string
-  /** Key inside its file. Differs from `key` when the file is a namespace. */
+  // Differs from `key` in a namespace file
   fileKey: string
-  /**
-   * The key's segments as written in the file: `['cart', 'title']` for a nested
-   * key, `['cart.title']` for a flat key with a dot in its name.
-   */
+  // As written: `['cart', 'title']` nested, `['cart.title']` flat
   filePath: string[]
 }
 
-/** Where an object (non-leaf) key starts, used to place annotations for missing keys. */
+// An object key, where annotations for missing keys point
 export interface Node extends Position {
   file: string
 }
 
 export interface LocaleFile {
   path: string
-  /** Prefix added to every key in this file (namespace files), or '' for single-file locales. */
+  // Prefix of every key in a namespace file, '' otherwise
   namespace: string
 }
 
@@ -47,18 +44,18 @@ export interface Locale {
   code: string
   files: LocaleFile[]
   entries: Map<string, Entry>
-  /** Every key path that exists in the source, including objects. */
+  // Every key path, objects included
   nodes: Map<string, Node>
-  /** Namespaces whose file could not be parsed. Checks skip their keys. */
+  // Unparsable namespaces, whose keys checks skip
   brokenNamespaces: Set<string>
 }
 
 export interface Project {
   baseLocale: string
   locales: Map<string, Locale>
-  /** Files that could not be parsed. Their locale is loaded without them. */
+  // Unparsable files; their locale loads without them
   parseErrors: Issue[]
-  /** Files that match a pattern but whose {locale} part is not a locale code. */
+  // Matched a pattern, but {locale} is not a locale code
   skipped: string[]
 }
 
@@ -71,14 +68,10 @@ export interface Issue {
   line?: number
   column?: number
   message: string
-  /**
-   * A suggestion shown after the message, e.g. "Did you mean `x`?". It is not
-   * part of the baseline fingerprint, so it can come and go without making an
-   * old issue look new.
-   */
+  // Not in the baseline fingerprint, so it can change without making an issue new
   hint?: string
   baseValue?: string
-  /** Extra lines shown collapsed under the issue, e.g. every key of a grouped issue. */
+  // Shown collapsed, e.g. every key of a grouped issue
   details?: string[]
   isNew: boolean
 }

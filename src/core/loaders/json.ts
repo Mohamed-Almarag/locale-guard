@@ -13,11 +13,7 @@ import {
   scalarToString
 } from './parsed.js'
 
-/**
- * Parses a JSON locale file and keeps the line and column of every key.
- * Comments and trailing commas are reported as errors, because the apps that
- * load these files use strict JSON.
- */
+// Comments and trailing commas are errors: apps load these files as strict JSON
 export function parseJson(text: string): ParseResult {
   const lines = new LineIndex(text)
   const errors: ParseError[] = []

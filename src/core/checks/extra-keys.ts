@@ -1,11 +1,7 @@
 import type { Issue, Locale } from '../types.js'
 import { type Check, isBroken } from './context.js'
 
-/**
- * A key exists in a locale but not in the base locale (usually removed or
- * misspelled). i18next plural forms the base lacks (Arabic `items_few`) are
- * part of a group the base has, so they are not extra.
- */
+// i18next plural forms the base lacks (Arabic `items_few`) are not extra
 export const extraKeys: Check = ({ base, targets, plurals }) => {
   const issues: Issue[] = []
 
@@ -33,12 +29,7 @@ export const extraKeys: Check = ({ base, targets, plurals }) => {
   return issues
 }
 
-/**
- * The base key an extra key was probably meant to be, when that key is missing
- * from the locale: the same key in other letter case (`states.add_State`), or
- * one part of the path spelled a little differently (`service.name` for
- * `services.name`). Undefined when there is no single match.
- */
+// A missing base key in other letter case, or with one path segment misspelled
 function meantKey(
   key: string,
   base: Locale,
@@ -63,14 +54,13 @@ function meantKey(
   return matches.length === 1 ? matches[0] : undefined
 }
 
-/** One or two edits apart, and long enough that this is not chance. */
+// Long enough that a small difference is not chance
 function isTypo(a: string, b: string): boolean {
   const shorter = Math.min(a.length, b.length)
   if (shorter < 4) return false
   return editDistance(a, b) <= (shorter >= 8 ? 2 : 1)
 }
 
-/** Levenshtein distance. */
 function editDistance(a: string, b: string): number {
   let previous = Array.from({ length: b.length + 1 }, (_, j) => j)
   for (let i = 1; i <= a.length; i++) {

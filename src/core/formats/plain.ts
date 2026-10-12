@@ -1,9 +1,9 @@
 import { type MessageInfo, finalize } from './message.js'
 
-// `{{name}}` (i18next, spaces allowed) and `{name}` (most other libraries).
+// `{{name}}` (i18next, spaces allowed) and `{name}` (most other libraries)
 const PLACEHOLDER = /\{\{\s*([\w.-]+)\s*\}\}|\{([\w.-]+)\}/g
 
-/** Plain JSON messages have no grammar, so placeholders are found with a pattern. */
+// Plain JSON has no grammar, so placeholders are found with a pattern
 export function describePlainMessage(source: string): MessageInfo {
   const placeholders: string[] = []
   for (const match of source.matchAll(PLACEHOLDER)) {
