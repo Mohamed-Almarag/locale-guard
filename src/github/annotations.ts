@@ -41,7 +41,10 @@ export function annotate(
 }
 
 function message(issue: Issue, baseLocale: string): string {
-  const plain = issue.message.replace(/`/g, '')
+  const plain = [issue.message, issue.hint]
+    .filter(Boolean)
+    .join('. ')
+    .replace(/`/g, '')
   return issue.baseValue !== undefined
     ? `${plain}\n${baseLocale}: ${issue.baseValue}`
     : plain
