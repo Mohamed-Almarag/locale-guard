@@ -11,7 +11,7 @@ export interface PullRequestInfo {
   number: number
   headSha: string
   baseSha: string
-  /** The head branch lives in another repository, so the token cannot write to this one. */
+  // The head is in another repo, so the token cannot write here
   isFork: boolean
 }
 
@@ -54,7 +54,6 @@ export function readRunContext(
   }
 }
 
-/** Builds links to a line of a file at a commit. */
 export function lineLinker(
   run: RunContext,
   sha: string

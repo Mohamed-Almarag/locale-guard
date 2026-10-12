@@ -6,8 +6,7 @@ import {
 } from '@intlify/message-compiler'
 import { type MessageInfo, finalize, mostWords } from './message.js'
 
-// Mirrors NodeTypes from @intlify/message-compiler. It is a `const enum`, which
-// cannot be imported under `isolatedModules`.
+// Mirrors NodeTypes, a `const enum` that `isolatedModules` cannot import
 const PLURAL = 1
 const TEXT = 3
 const NAMED = 4
@@ -16,11 +15,6 @@ const LINKED = 6
 const LINKED_KEY = 7
 const LITERAL = 9
 
-/**
- * Reads a vue-i18n message with the official compiler:
- *   named `{name}`, list `{0}`, linked `@:common.save` / `@.lower:common.save`,
- *   literal `{'@'}`, and plural branches separated by `|`.
- */
 export function describeVueMessage(source: string): MessageInfo {
   const errors: CompileError[] = []
   let ast: ResourceNode

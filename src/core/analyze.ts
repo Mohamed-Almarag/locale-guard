@@ -6,15 +6,13 @@ import type { CheckId, Format, Issue, Project } from './types.js'
 
 export interface AnalyzeOptions {
   format: Format
-  /** Checks to skip, by name. */
   disabledChecks?: CheckId[]
-  /** Key globs to leave out, e.g. `legacy.*`. */
+  // Globs, e.g. `legacy.*`
   ignoreKeys?: string[]
-  /** Values allowed to stay untranslated, e.g. brand names. */
   ignoreValues?: string[]
 }
 
-/** Runs every enabled check on a loaded project. Never touches files or GitHub. */
+// Pure: never touches files or GitHub
 export function analyze(project: Project, options: AnalyzeOptions): Issue[] {
   const disabled = new Set(options.disabledChecks ?? [])
   const issues = disabled.has('parse-error') ? [] : [...project.parseErrors]
@@ -36,7 +34,7 @@ export function analyze(project: Project, options: AnalyzeOptions): Issue[] {
   )
 }
 
-/** Errors first, then by locale, file and line. */
+// Errors first, then by locale, file and line
 export function sortIssues(issues: Issue[]): Issue[] {
   return [...issues].sort(
     (a, b) =>
@@ -52,11 +50,7 @@ const PLURAL_FORM = new RegExp(
   `^(.+_(?:ordinal_)?)(${PLURAL_CATEGORIES.join('|')})$`
 )
 
-/**
- * Alphabetical, except that plural forms of one key keep their natural order:
- * `items_zero`, `items_one`, `items_two`, `items_few`, `items_many`,
- * `items_other`.
- */
+// Alphabetical, but plural forms of one key keep CLDR order (zero … other)
 function compareKeys(a: string, b: string): number {
   const pluralA = PLURAL_FORM.exec(a)
   const pluralB = PLURAL_FORM.exec(b)

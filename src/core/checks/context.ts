@@ -13,13 +13,12 @@ export interface CheckContext {
   project: Project
   format: Format
   base: Locale
-  /** Every locale except the base one. */
+  // Every locale except the base
   targets: Locale[]
-  /** Parses a message in the project's format. Results are cached. */
+  // Cached per message
   describe: (source: string) => MessageInfo
-  /** Values that may stay identical to the base or in another script (brand names). */
   ignoreValues: string[]
-  /** i18next plural keys (`items_one`, `items_other`), for plain JSON projects. */
+  // Plain JSON only: i18next `items_one`, `items_other`
   plurals?: SuffixPlurals
 }
 
@@ -46,10 +45,7 @@ export function createContext(
   }
 }
 
-/**
- * The base entry a key is compared with: the same key, or for an i18next plural
- * form the base lacks (Arabic `items_few`), the base `other` form.
- */
+// The same key, or the base `other` form for a plural form the base lacks
 export function baseEntryFor(
   { base, plurals }: CheckContext,
   key: string
@@ -60,7 +56,7 @@ export function baseEntryFor(
   return plural ? base.entries.get(baseKeyFor(base, plural)) : undefined
 }
 
-/** The namespace a key belongs to in a locale: the longest file namespace that prefixes it. */
+// The longest file namespace that prefixes the key
 export function namespaceOf(locale: Locale, key: string): string {
   let best = ''
   for (const { namespace } of locale.files) {
@@ -79,10 +75,7 @@ export function isBroken(locale: Locale, key: string): boolean {
   return locale.brokenNamespaces.has(namespaceOf(locale, key))
 }
 
-/**
- * The file a key should live in for a locale. Falls back to the base file's
- * path with the locale code swapped, for namespace files that do not exist yet.
- */
+// Falls back to the base file's path with the locale swapped, for files not created yet
 export function expectedFile(
   target: Locale,
   base: Locale,
@@ -97,7 +90,7 @@ export function expectedFile(
     : (target.files[0]?.path ?? '')
 }
 
-/** Where to point an annotation for a key that does not exist: its closest existing parent. */
+// The closest existing parent of a missing key
 export function anchorFor(locale: Locale, key: string): Position {
   const parts = key.split('.')
   for (let length = parts.length - 1; length > 0; length--) {

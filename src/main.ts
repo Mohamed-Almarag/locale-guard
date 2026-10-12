@@ -34,7 +34,7 @@ import {
 import { renderReport } from './reporters/markdown.js'
 import { SUMMARY_LIMIT, writeSummary } from './reporters/summary.js'
 
-/** GitHub rejects comments longer than 65,536 characters. */
+// GitHub rejects comments over 65,536 characters
 const COMMENT_LIMIT = 65_000
 
 const INPUTS = [
@@ -88,8 +88,7 @@ async function check(
   const octokit = token ? github.getOctokit(token) : undefined
   const pr = context.pullRequest
 
-  // Leave quickly when the pull request does not touch translations, unless
-  // the repo asked to see its existing issues on every pull request.
+  // Leave early when no locale file changed, unless check-when is always
   const always = config['check-when'] === 'always'
   if (
     !always &&
@@ -137,7 +136,7 @@ async function check(
 
   await writeSummary(renderReport({ ...report, maxLength: SUMMARY_LIMIT }))
   if (config.annotations) {
-    // With a baseline, old issues are not annotated: they are not this PR's doing.
+    // Old issues are not this PR's doing, so they are not annotated
     annotate(
       hasBaseline ? issues.filter((issue) => issue.isNew) : issues,
       baseLocale
@@ -151,10 +150,10 @@ async function check(
         ...report,
         maxLength: COMMENT_LIMIT,
         summaryUrl: context.runUrl,
-        // With check-when: always, old issues are the point, so they are listed open.
+        // check-when: always lists old issues open
         existing: always ? 'open' : 'counts'
       }),
-      // A new comment is added for new issues, or for any issue with check-when: always.
+      // A new comment for new issues, or for any issue with check-when: always
       always ? issues.length > 0 : issues.some((issue) => issue.isNew)
     )
   }
@@ -177,10 +176,7 @@ async function check(
   }
 }
 
-/**
- * Runs the same checks on the base branch. Returns undefined when the base
- * cannot be read, so every issue is treated as new instead of failing the run.
- */
+// Undefined when the base cannot be read, so every issue counts as new
 async function analyzeBase(
   octokit: Octokit,
   context: RunContext,
@@ -222,7 +218,7 @@ function analyzeOptions(config: Config): AnalyzeOptions {
   }
 }
 
-/** The optional config file. Undefined when there is none, a message when it is broken. */
+// Undefined when there is none, a message when it is broken
 async function loadConfigFile(
   workspace: string,
   path: string
@@ -248,8 +244,7 @@ async function skipPullRequest(
   try {
     const changed = await listChangedFiles(octokit, context.repo, pr.number)
     if (touchesLocales(changed, config.files, [configPath])) return false
-    // A previous run left a comment, e.g. before a fix reverted the locale
-    // changes. Run again so the comment does not show stale issues.
+    // A previous comment may show stale issues, so run again
     return !(
       config.comment && (await findComment(octokit, context.repo, pr.number))
     )
@@ -270,7 +265,7 @@ async function comment(
   const pr = context.pullRequest
   if (!pr) return
 
-  // A fork's token is read-only, so do not even try.
+  // A fork's token is read-only
   if (pr.isFork) {
     core.info(
       'This pull request comes from a fork, and GitHub gives forks a read-only token, so Locale Guard cannot comment. The results are in the job summary and the annotations.'
@@ -298,10 +293,7 @@ async function comment(
   }
 }
 
-/**
- * Lists new issues one per line. Existing issues get one count line: a large
- * project can have 100,000 of them, and the job summary already lists them.
- */
+// Existing issues get one count line: there can be 100,000 of them
 function logIssues(issues: Issue[]): void {
   const fresh = issues.filter((issue) => issue.isNew)
   const existing = issues.length - fresh.length

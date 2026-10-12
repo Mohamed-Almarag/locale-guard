@@ -9,9 +9,9 @@ import type { ParseResult } from './parsed.js'
 import { matchPattern, toGlob } from './pattern.js'
 import { parseYaml } from './yaml.js'
 
-/** Where locale files come from: the checked-out repo, or the base branch through the API. */
+// The checked-out repo, or the base branch through the API
 export interface FileSource {
-  /** Returns repo-relative paths with forward slashes. */
+  // Repo-relative paths with forward slashes
   glob(patterns: string[]): Promise<string[]>
   read(path: string): Promise<string>
 }
@@ -29,7 +29,7 @@ export function localFileSource(root: string): FileSource {
   }
 }
 
-/** A source built from a known list of paths, e.g. a git tree or an in-memory map in tests. */
+// From a known list of paths, e.g. a git tree or an in-memory map in tests
 export function listFileSource(
   paths: string[],
   read: (path: string) => Promise<string>
@@ -72,7 +72,7 @@ export async function loadProject(
     for (const path of paths.sort()) {
       const match = matchPattern(pattern, path)
       if (!match || ignored.has(match.locale)) continue
-      // e.g. locales/vee-validate-ur.json next to the real locale files.
+      // e.g. locales/vee-validate-ur.json next to the real locale files
       if (!intlLocale(match.locale)) {
         skipped.push(path)
         continue

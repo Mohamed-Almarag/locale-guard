@@ -1,10 +1,7 @@
 import type { Issue } from '../types.js'
 import { type Check, isBroken } from './context.js'
 
-/**
- * A vue-i18n linked message (`@:common.save`) points to a key that does not
- * exist in the same locale, so the message renders broken.
- */
+// `@:common.save` pointing to a key the locale does not have
 export const brokenLinkedMessages: Check = ({
   format,
   base,

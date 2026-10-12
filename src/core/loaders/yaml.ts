@@ -15,7 +15,6 @@ import {
   scalarToString
 } from './parsed.js'
 
-/** Parses a YAML locale file and keeps the line and column of every key. */
 export function parseYaml(text: string): ParseResult {
   const lineCounter = new LineCounter()
   const doc = parseDocument(text, { lineCounter, prettyErrors: false })
@@ -89,7 +88,7 @@ export function parseYaml(text: string): ParseResult {
     }
   }
 
-  // An empty file, or one with only `---` or comments: a locale with no keys yet.
+  // An empty file, or one with only `---` or comments: a locale with no keys yet
   const contents = doc.contents
   if (contents === null || (isScalar(contents) && contents.value === null)) {
     return { ok: true, entries, nodes }

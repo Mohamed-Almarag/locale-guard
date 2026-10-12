@@ -17,11 +17,7 @@ const CHECK_IDS = [
   'plural-forms'
 ] as const
 
-/**
- * The `format` setting names the library that reads the messages. Libraries
- * that share a message syntax share a format: react-intl writes ICU messages
- * just like next-intl, and react-i18next writes plain JSON.
- */
+// Libraries that share a message syntax share a format
 export const FORMATS = {
   'vue-i18n': 'vue-i18n',
   '@nuxtjs/i18n': 'vue-i18n',
@@ -37,10 +33,7 @@ export const FORMATS = {
   'i18next-vue': 'json'
 } as const satisfies Record<string, Format>
 
-/**
- * A framework can use more than one library, and each writes messages its own
- * way, so a framework name is answered with the libraries to choose from.
- */
+// A framework name is answered with the libraries it can use
 const FRAMEWORKS: Record<string, string> = {
   nuxt: '@nuxtjs/i18n',
   vue: 'vue-i18n or i18next-vue',
@@ -57,11 +50,7 @@ const list = z
       .filter(Boolean)
   )
 
-/**
- * Values are whole texts that may contain commas ("Visa, Mastercard, Amex"),
- * so a line is kept whole. Its comma-separated parts are kept too, so
- * `Google, OK` written on one line still ignores both.
- */
+// A line can hold commas ("Visa, Mastercard, Amex"), so it is kept whole and split
 const valueList = z
   .union([z.array(z.string()), z.string()])
   .transform((value) => {
@@ -114,10 +103,7 @@ export interface ConfigFile {
   values: Record<string, unknown>
 }
 
-/**
- * Validates the settings and fills in defaults. Settings come from the
- * optional config file and from action inputs; an input that was set wins.
- */
+// An input that was set wins over the config file
 export function parseConfig(
   inputs: Record<string, unknown>,
   file?: ConfigFile
@@ -159,7 +145,7 @@ export function parseConfig(
   }
 }
 
-/** Reads `.localeguard.yml`. Returns an error message when it is not a YAML map. */
+// Returns an error message when the file is not a YAML map
 export function readConfigFile(
   path: string,
   text: string

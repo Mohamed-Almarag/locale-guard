@@ -4,18 +4,15 @@ import type { Octokit } from '../../src/github/context.js'
 export interface FakeState {
   comments: { id: number; body: string; html_url: string }[]
   files: { filename: string; previous_filename?: string }[]
-  /** HTTP status to throw on comment writes, e.g. 403 for a read-only token. */
+  // e.g. 403 for a read-only token
   writeError?: number
-  /** Files of the base branch, served through the git trees and blobs API. */
+  // Served through the git trees and blobs API
   baseFiles?: Record<string, string>
 }
 
 export const BASE_SHA = 'base-sha'
 
-/**
- * Serves `baseFiles` like the git data API: the commit SHA is the root tree,
- * folders are `tree:<dir>` and files are `blob:<path>`.
- */
+// The commit SHA is the root tree, folders are `tree:<dir>`, files `blob:<path>`
 function gitApi(files: Record<string, string>) {
   const dirOf = (treeSha: string) =>
     treeSha === BASE_SHA ? '' : treeSha.replace(/^tree:/, '')
@@ -63,7 +60,7 @@ function gitApi(files: Record<string, string>) {
   }
 }
 
-/** A minimal Octokit stand-in that covers the endpoints Locale Guard uses. */
+// Covers the endpoints Locale Guard uses
 export function fakeOctokit(state: FakeState) {
   const fail = () => {
     if (state.writeError) {
