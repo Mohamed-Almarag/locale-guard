@@ -16,7 +16,7 @@ export async function load(
   })
 }
 
-/** Loads in-memory files and returns the issues of a single check. */
+// Issues of a single check on in-memory files
 export async function run(
   check: CheckId,
   files: Record<string, string>,
@@ -28,7 +28,7 @@ export async function run(
   )
 }
 
-/** A compact view of issues that keeps tests readable. */
+// One line per issue
 export function summarize(issues: Issue[]): string[] {
   return issues.map(
     (issue) =>

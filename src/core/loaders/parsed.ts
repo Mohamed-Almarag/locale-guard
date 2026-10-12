@@ -2,7 +2,7 @@ import type { Position } from '../types.js'
 
 export interface ParsedEntry extends Position {
   key: string
-  /** The key's segments as written: a flat `"cart.title"` stays one segment. */
+  // A flat `"cart.title"` stays one segment
   path: string[]
   value: string
 }
@@ -15,7 +15,7 @@ export type ParseResult =
   | { ok: true; entries: ParsedEntry[]; nodes: ParsedNode[] }
   | { ok: false; message: string; line: number; column: number }
 
-/** Maps character offsets to 1-based line and column numbers. */
+// Character offsets to 1-based line and column
 export class LineIndex {
   private readonly starts: number[] = [0]
 

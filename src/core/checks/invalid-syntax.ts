@@ -1,10 +1,7 @@
 import type { Issue } from '../types.js'
 import type { Check } from './context.js'
 
-/**
- * A message the i18n library cannot compile. vue-i18n and next-intl
- * fail at runtime on these, so they are errors in every locale.
- */
+// The library fails on these at runtime, so they are errors in every locale
 export const invalidSyntax: Check = ({ base, targets, describe }) => {
   const issues: Issue[] = []
 

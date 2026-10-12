@@ -10,16 +10,10 @@ import {
   mostWords
 } from './message.js'
 
-/**
- * Reads an ICU message (next-intl) with the FormatJS parser:
- *   arguments `{amount}`, `{amount, number}`, `{count, plural, ...}`,
- *   `{gender, select, ...}`, and rich text tags `<b>...</b>`.
- */
 export function describeIcuMessage(source: string): MessageInfo {
   let elements: MessageFormatElement[]
   try {
-    // `other` is required by ICU, but the plural-forms check reports it with a
-    // clearer message, so the parser must not fail on it.
+    // plural-forms reports a missing `other` with a clearer message
     elements = parse(source, { requiresOtherClause: false })
   } catch (error) {
     const location = (error as { location?: { start?: { column?: number } } })
@@ -96,7 +90,7 @@ function hasBranches(nodes: MessageFormatElement[]): boolean {
   )
 }
 
-/** The text of one rendering, taking the branch with the most words at each plural or select. */
+// Takes the branch with the most words at each plural or select
 function longestRendering(nodes: MessageFormatElement[]): string {
   return nodes
     .map((node) => {

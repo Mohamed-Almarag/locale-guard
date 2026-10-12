@@ -137,7 +137,7 @@ describe('i18next plural keys (plain JSON)', () => {
     expect(body).toContain('  "cart.items_few": "",')
     expect(body).toContain('  "cart.items_other": ""')
     expect(body).not.toContain('"cart": {')
-    // Arabic-only forms link to the English `other` form, the text to translate.
+    // Arabic-only forms link to the English `other` form, the text to translate
     expect(body).toContain('[`cart.items_few`](https://x/locales/en.json#L3)')
   })
 

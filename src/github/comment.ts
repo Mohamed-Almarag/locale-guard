@@ -6,13 +6,7 @@ export type CommentResult =
   | { status: 'skipped' }
   | { status: 'forbidden'; message: string }
 
-/**
- * Keeps a single Locale Guard comment per pull request. It finds the
- * comment by its hidden marker and edits it, so every run updates the same one.
- *
- * A new comment is only created when `createIfMissing` is set, so a clean pull
- * request gets no comment at all.
- */
+// Edits the comment with the marker; creates one only when `createIfMissing` is set
 export async function upsertComment(
   octokit: Octokit,
   repo: RepoRef,
@@ -44,7 +38,7 @@ export async function upsertComment(
     })
     return { status: 'created', url: data.html_url }
   } catch (error) {
-    // Read-only tokens (forks, Dependabot) or missing `pull-requests: write`.
+    // Read-only tokens (forks, Dependabot) or missing `pull-requests: write`
     const status = (error as { status?: number }).status
     if (status === 403 || status === 404) {
       return {
@@ -56,7 +50,6 @@ export async function upsertComment(
   }
 }
 
-/** The Locale Guard comment on a pull request, found by its hidden marker. */
 export async function findComment(
   octokit: Octokit,
   repo: RepoRef,

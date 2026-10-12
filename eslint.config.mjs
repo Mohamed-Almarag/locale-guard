@@ -1,5 +1,3 @@
-// See: https://eslint.org/docs/latest/use/configure/configuration-files
-
 import { FlatCompat } from '@eslint/eslintrc'
 import js from '@eslint/js'
 import typescriptEslint from '@typescript-eslint/eslint-plugin'

@@ -1,7 +1,7 @@
 import type { Issue } from '../types.js'
 import type { Check } from './context.js'
 
-/** A key exists but its value is empty or only whitespace. Checked in every locale. */
+// Checked in every locale, the base included
 export const emptyValues: Check = ({ base, targets }) => {
   const issues: Issue[] = []
 

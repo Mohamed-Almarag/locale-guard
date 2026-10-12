@@ -1,14 +1,9 @@
-/** Plural categories in the order CLDR lists them. */
+// In CLDR order
 export const PLURAL_CATEGORIES = ['zero', 'one', 'two', 'few', 'many', 'other']
 
 const requiredCache = new Map<string, string[]>()
 
-/**
- * Categories a plural message must cover in a language: the ones that whole
- * numbers from 0 to 1000 reach, plus `other`. This leaves out forms that only
- * apply to millions or decimals, such as French `many`, which almost no
- * project writes.
- */
+// Forms reached by whole numbers 0 to 1000, plus `other`; skips French `many`
 export function requiredCategories(locale: string, ordinal: boolean): string[] {
   const id = `${locale}|${ordinal}`
   const cached = requiredCache.get(id)

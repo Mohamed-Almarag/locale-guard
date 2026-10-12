@@ -3,17 +3,10 @@ import { type FileSource, listFileSource } from '../core/loaders/index.js'
 import { toGlob } from '../core/loaders/pattern.js'
 import type { Octokit, RepoRef } from './context.js'
 
-/** Parallel blob downloads, kept low to stay clear of GitHub's secondary rate limits. */
+// Kept low to avoid GitHub's secondary rate limits
 const CONCURRENCY = 8
 
-/**
- * Reads the locale files of the base branch through the API, so users do
- * not need `fetch-depth: 0` in actions/checkout.
- *
- * Only the folders the patterns can match are listed (e.g. `locales/` for
- * `locales/{locale}.json`), which keeps large repositories fast and avoids the
- * size limit of a recursive tree of the whole repo.
- */
+// Through the API, so users need no `fetch-depth: 0` in actions/checkout
 export async function baseFileSource(
   octokit: Octokit,
   repo: RepoRef,
@@ -58,7 +51,7 @@ export async function baseFileSource(
   )
 }
 
-/** The fixed folders at the start of each pattern, without folders nested in another one. */
+// Fixed leading folders, without folders nested in another one
 export function rootDirs(patterns: string[]): string[] {
   const dirs = patterns.map((pattern) => {
     const segments = toGlob(pattern).split('/')
@@ -115,7 +108,7 @@ function limiter(max: number) {
   }
 }
 
-/** Every file the pull request touches, including the old name of renamed files. */
+// Renamed files count with their old name too
 export async function listChangedFiles(
   octokit: Octokit,
   repo: RepoRef,
@@ -133,7 +126,7 @@ export async function listChangedFiles(
   )
 }
 
-/** Whether any changed file is a locale file or the config file. */
+// The config file counts too
 export function touchesLocales(
   changed: string[],
   patterns: string[],

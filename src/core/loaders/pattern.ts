@@ -1,13 +1,4 @@
-/**
- * File patterns use `{locale}` where the locale code appears in the path:
- *
- *   locales/{locale}.json         -> locales/ar.json            (locale "ar")
- *   locales/{locale}/*.json       -> locales/ar/checkout.json   (locale "ar", namespace "checkout")
- *   locales/{locale}/**\/*.yml    -> locales/ar/admin/users.yml (locale "ar", namespace "admin.users")
- *
- * A `*` in the file name or in a folder becomes part of the namespace, so every
- * key in that file is prefixed with it.
- */
+// A `*` in the path becomes the namespace: `locales/{locale}/*.json`
 
 export interface PatternMatch {
   locale: string
@@ -23,7 +14,7 @@ export function validatePattern(pattern: string): string | undefined {
   return undefined
 }
 
-/** Turns a pattern into a glob that finds every locale. */
+// Matches every locale
 export function toGlob(pattern: string): string {
   return normalize(pattern).replace(LOCALE, '*')
 }
@@ -69,7 +60,7 @@ function compile(pattern: string): {
       source += `(?:(?<${name}>.+)/)?`
       i += 3
     } else if (pattern[i] === '*') {
-      // A star right after a dot is a file extension, not a namespace.
+      // A star right after a dot is a file extension, not a namespace
       if (pattern[i - 1] === '.') {
         source += '[^/]+'
       } else {
