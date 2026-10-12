@@ -95,6 +95,7 @@ export const configSchema = z.strictObject({
     }),
   'fail-on': z.enum(['error', 'warning', 'never']).default('error'),
   'fail-on-existing': flag.default(false),
+  'check-when': z.enum(['locale-changes', 'always']).default('locale-changes'),
   comment: flag.default(true),
   annotations: flag.default(true),
   'ignore-keys': list.default([]),
