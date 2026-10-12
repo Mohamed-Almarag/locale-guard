@@ -305,7 +305,7 @@ function logIssues(issues: Issue[]): void {
     )
     for (const issue of fresh) {
       core.info(
-        `${issue.severity} ${issue.locale} ${issue.file}${issue.line ? `:${issue.line}` : ''} ${issue.message.replace(/`/g, '')}`
+        `${issue.severity} ${issue.locale} ${issue.file}${issue.line ? `:${issue.line}` : ''} ${[issue.message, issue.hint].filter(Boolean).join('. ').replace(/`/g, '')}`
       )
     }
     core.endGroup()
