@@ -71,6 +71,12 @@ export interface Issue {
   line?: number
   column?: number
   message: string
+  /**
+   * A suggestion shown after the message, e.g. "Did you mean `x`?". It is not
+   * part of the baseline fingerprint, so it can come and go without making an
+   * old issue look new.
+   */
+  hint?: string
   baseValue?: string
   /** Extra lines shown collapsed under the issue, e.g. every key of a grouped issue. */
   details?: string[]

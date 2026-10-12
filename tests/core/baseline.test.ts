@@ -8,6 +8,23 @@ async function issues(files: Record<string, string>) {
 }
 
 describe('markNew', () => {
+  it('keeps an old extra key existing when its suggestion changes', async () => {
+    const base = await issues({
+      'locales/en.json': json({ services: { name: 'Name' } }),
+      'locales/tr.json': json({ service: { name: 'Ad' } })
+    })
+    const head = await issues({
+      'locales/en.json': json({ services: { name: 'Name' } }),
+      'locales/tr.json': json({
+        service: { name: 'Ad' },
+        services: { name: 'Ad' }
+      })
+    })
+    expect(base.find((i) => i.check === 'extra-keys')?.hint).toBeDefined()
+    const extra = markNew(head, base).find((i) => i.check === 'extra-keys')
+    expect(extra).toMatchObject({ hint: undefined, isNew: false })
+  })
+
   it('marks issues that already exist on the base branch as existing', async () => {
     const base = await issues({
       'locales/en.json': json({ a: 'A', b: 'B' }),

@@ -155,6 +155,16 @@ describe('renderReport', () => {
     )
   })
 
+  it('adds the suggested key after an extra key', async () => {
+    const body = await report({
+      'locales/en.json': json({ services: { name: 'Name' } }),
+      'locales/tr.json': json({ service: { name: 'Ad' } })
+    })
+    expect(body).toContain(
+      '- Key `service.name` does not exist in en. Did you mean `services.name`? · [tr.json:3](https://x/locales/tr.json#L3)'
+    )
+  })
+
   it('splits new and existing issues and collapses the existing ones', async () => {
     const body = await report(
       {

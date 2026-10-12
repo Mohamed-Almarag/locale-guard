@@ -132,6 +132,47 @@ describe('extra-keys', () => {
     ])
   })
 
+  it('suggests the base key when only the letter case differs', async () => {
+    const issues = await run('extra-keys', {
+      'locales/en.json': json({ states: { add_state: 'Add state' } }),
+      'locales/tr.json': json({ states: { add_State: 'Durum Ekle' } })
+    })
+    expect(issues.map((issue) => issue.hint)).toEqual([
+      'Did you mean `states.add_state`?'
+    ])
+  })
+
+  it('suggests the base key when one part of the path is spelled a little differently', async () => {
+    const issues = await run('extra-keys', {
+      'locales/en.json': json({
+        services: { name: 'Name', code: 'Code' },
+        connectionVerified: 'Connection verified'
+      }),
+      'locales/tr.json': json({
+        service: { name: 'Ad', code: 'Kod' },
+        connectionVerifeid: 'Bağlantı doğrulandı'
+      })
+    })
+    expect(issues.map((issue) => [issue.key, issue.hint])).toEqual([
+      ['service.name', 'Did you mean `services.name`?'],
+      ['service.code', 'Did you mean `services.code`?'],
+      ['connectionVerifeid', 'Did you mean `connectionVerified`?']
+    ])
+  })
+
+  it('does not suggest a key the locale already has, or an unrelated one', async () => {
+    const issues = await run('extra-keys', {
+      'locales/en.json': json({ menu: { save: 'Save', home: 'Home' } }),
+      'locales/ar.json': json({
+        menu: { save: 'حفظ', Save: 'حفظ', exit: 'خروج' }
+      })
+    })
+    expect(issues.map((issue) => [issue.key, issue.hint])).toEqual([
+      ['menu.Save', undefined],
+      ['menu.exit', undefined]
+    ])
+  })
+
   it('skips keys when the base file could not be parsed', async () => {
     const issues = await run('extra-keys', {
       'locales/en.json': '{',
