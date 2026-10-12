@@ -17,11 +17,12 @@ export interface ReportInput {
   maxLength?: number
   summaryUrl?: string
   /**
-   * How to show issues that existed before the pull request: every issue (job
-   * summary), or a count per locale and check (PR comment, which stays small
-   * on projects with many old issues).
+   * How to show issues that existed before the pull request: every issue,
+   * collapsed (job summary) or open (PR comment with check-when: always), or a
+   * count per locale and check (PR comment, which stays small on projects with
+   * many old issues).
    */
-  existing?: 'list' | 'counts'
+  existing?: 'list' | 'open' | 'counts'
 }
 
 const LABELS: Record<CheckId, [singular: string, plural: string]> = {
@@ -49,7 +50,8 @@ export function renderReport(input: ReportInput): string {
 
   let body = `${MARKER}\n${title(fresh, existing)}\n`
   if (input.hasBaseline && input.issues.length > 0) {
-    body += `\nNew in this PR: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ' (collapsed below)' : ''}\n`
+    const where = input.existing === 'open' ? 'listed below' : 'collapsed below'
+    body += `\nNew in this PR: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ` (${where})` : ''}\n`
   }
 
   let omitted = 0
@@ -62,7 +64,8 @@ export function renderReport(input: ReportInput): string {
   if (existing.length > 0 && input.existing === 'counts') {
     body += `\n${existingCounts(existing, input.summaryUrl)}`
   } else if (existing.length > 0) {
-    let details = `\n<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`
+    const open = input.existing === 'open' ? ' open' : ''
+    let details = `\n<details${open}><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`
     for (const group of groupIssues(existing)) {
       const section = `\n${renderGroup(group, input, '####')}`
       if (body.length + details.length + section.length > limit) {

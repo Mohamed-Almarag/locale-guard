@@ -17,6 +17,7 @@ describe('parseConfig', () => {
           files: ['locales/{locale}.json'],
           'fail-on': 'error',
           'fail-on-existing': false,
+          'check-when': 'locale-changes',
           comment: true,
           annotations: true,
           'ignore-keys': [],
@@ -70,6 +71,16 @@ describe('parseConfig', () => {
     expect(result.ok && result.config['ignore-values']).toEqual([
       'Visa, Mastercard, Amex',
       'PayPal'
+    ])
+  })
+
+  it('rejects an unknown check-when value', () => {
+    const result = parseConfig({
+      files: 'locales/{locale}.json',
+      'check-when': 'sometimes'
+    })
+    expect(!result.ok && result.errors).toEqual([
+      'Invalid "check-when": expected one of locale-changes, always (got "sometimes")'
     ])
   })
 
