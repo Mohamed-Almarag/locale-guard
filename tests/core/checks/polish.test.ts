@@ -86,6 +86,18 @@ describe('untranslated', () => {
     expect(icuIssues).toEqual([])
   })
 
+  it('leaves values that are only a file name, like an export file', async () => {
+    const issues = await run('untranslated', {
+      'locales/en.json': json({ file: 'comments.xlsx', text: 'comments xlsx' }),
+      'locales/ar.json': json({ file: 'comments.xlsx', text: 'comments xlsx' }),
+      'locales/fr.json': json({ file: 'comments.xlsx', text: 'comments xlsx' })
+    })
+    expect(summarize(issues)).toEqual([
+      'ar text:3 `text`: same text as en',
+      'fr text:3 `text`: same text as en'
+    ])
+  })
+
   it('does not compare variants of the same language', async () => {
     const issues = await run(
       'untranslated',
