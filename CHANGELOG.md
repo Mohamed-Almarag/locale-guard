@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-10-12
+
+### Added
+
+- `check-when: always` runs the checks on every pull request, even one that does
+  not touch a locale file, and lists existing issues open in the comment. They
+  still fail the check only with `fail-on-existing: true`. The default,
+  `locale-changes`, keeps the current behavior.
+- An extra key that looks like a base key the locale is missing gets a hint:
+  "Did you mean `states.add_state`?". It covers keys in other letter case and
+  one part of the path spelled a little differently.
+
+### Fixed
+
+- `ignore-values` keeps a line whole when it contains commas, so
+  `Visa, Mastercard, Amex` can be ignored as one value. Each part of the line is
+  still ignored on its own.
+- Italian is treated as related to Spanish and Portuguese, so sentences that are
+  written the same way in these languages are not reported as copied.
+- The untranslated check counts the words of one plural branch:
+  `ticket | tickets` is one word, not two.
+- File names such as `comments.xlsx` are not reported as untranslated.
+
 ## [1.0.3] - 2026-10-10
 
 ### Fixed
@@ -72,6 +95,7 @@ First release.
 - `fail-on`, `fail-on-existing`, `ignore-keys`, `ignore-locales`,
   `ignore-values` and `disable-checks`.
 
+[1.1.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.1.0
 [1.0.3]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.3
 [1.0.2]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.2
 [1.0.1]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.1
