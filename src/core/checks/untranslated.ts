@@ -42,14 +42,15 @@ const LONG_WORD = /[\p{L}\p{M}]{3,}/gu
 
 /**
  * Languages close enough that whole sentences are often written the same way
- * ("Generar Factura" in Spanish and Catalan), or that share characters
+ * ("Generar Factura" in Spanish and Catalan, "Una persona" in Spanish and
+ * Italian, "Nome completo" in Italian and Portuguese), or that share characters
  * ("API Key 管理" in Chinese and Japanese). Values shared inside a group are
  * not reported by the cross-locale rule.
  */
 const RELATED_LANGUAGES = [
   ['zh', 'ja'],
   ['no', 'nb', 'nn', 'da'],
-  ['es', 'ca', 'gl', 'pt', 'ast'],
+  ['es', 'ca', 'gl', 'pt', 'ast', 'it'],
   ['tr', 'az'],
   ['sr', 'hr', 'bs', 'sh', 'cnr'],
   ['cs', 'sk'],
