@@ -1,3 +1,4 @@
+import { wordCount } from '../formats/message.js'
 import { languageOf } from '../locale-code.js'
 import type { Entry, Issue, Locale } from '../types.js'
 import { type Check, type CheckContext, baseEntryFor } from './context.js'
@@ -35,8 +36,6 @@ const SCRIPTS: Record<string, { name: string; letters: RegExp }> = {
 
 const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
 const LETTER = /\p{L}/u
-/** Letters plus combining marks, so Hindi or vowelled Arabic words stay whole; "E-mail" is one word. */
-const WORD = /[\p{L}\p{M}]+(?:[-'’][\p{L}\p{M}]+)*/gu
 /** Words that carry meaning, so date formats like "H:mm:ss" are not counted as text. */
 const LONG_WORD = /[\p{L}\p{M}]{3,}/gu
 
@@ -99,11 +98,14 @@ const perValue: Check = (context) => {
       const text = visibleText(describe, entry.value)
       if (text === undefined || !LETTER.test(text)) continue
 
+      // A plural message counts the words of one branch: `ticket | tickets` is one word.
+      const shown =
+        describe(entry.value).longestText?.replace(URL_OR_EMAIL, ' ') ?? text
       let message: string | undefined
       if (
         language !== baseLanguage &&
         value === baseEntry.value.trim() &&
-        wordCount(text) >= 2
+        wordCount(shown) >= 2
       ) {
         message = `\`${key}\`: same text as ${base.code}`
       } else if (script && !script.letters.test(text)) {
@@ -207,10 +209,6 @@ function visibleText(
 ): string | undefined {
   const info = describe(value)
   return info.error ? undefined : info.text.replace(URL_OR_EMAIL, ' ')
-}
-
-function wordCount(text: string, pattern = WORD): number {
-  return text.match(pattern)?.length ?? 0
 }
 
 function ignoredSet(values: string[]): Set<string> {

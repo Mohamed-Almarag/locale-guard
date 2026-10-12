@@ -4,7 +4,7 @@ import {
   type ResourceNode,
   createParser
 } from '@intlify/message-compiler'
-import { type MessageInfo, finalize } from './message.js'
+import { type MessageInfo, finalize, mostWords } from './message.js'
 
 // Mirrors NodeTypes from @intlify/message-compiler. It is a `const enum`, which
 // cannot be imported under `isolatedModules`.
@@ -43,14 +43,15 @@ export function describeVueMessage(source: string): MessageInfo {
 
   const placeholders: string[] = []
   const linkedKeys: string[] = []
-  let text = ''
+  const cases: string[] = []
 
-  const messages: MessageNode[] =
-    ast.body.type === PLURAL
-      ? (ast.body as { cases: MessageNode[] }).cases
-      : [ast.body as MessageNode]
+  const isPlural = ast.body.type === PLURAL
+  const messages: MessageNode[] = isPlural
+    ? (ast.body as { cases: MessageNode[] }).cases
+    : [ast.body as MessageNode]
 
   for (const message of messages) {
+    let text = ''
     for (const item of message.items) {
       switch (item.type as number) {
         case TEXT:
@@ -80,10 +81,16 @@ export function describeVueMessage(source: string): MessageInfo {
         }
       }
     }
-    text += ' '
+    cases.push(text.trim())
   }
 
-  return finalize({ placeholders, linkedKeys, plurals: [], text: text.trim() })
+  return finalize({
+    placeholders,
+    linkedKeys,
+    plurals: [],
+    text: cases.join(' ').trim(),
+    longestText: isPlural ? mostWords(cases) : undefined
+  })
 }
 
 function failed(error: string): MessageInfo {
