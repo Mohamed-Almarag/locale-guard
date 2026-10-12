@@ -26,8 +26,12 @@ pre-commit:
       run: npm test
 
 # Rebuilds dist/ and blocks the push if the committed bundle is out of date,
-# because GitHub runs dist/index.js exactly as it is in the repo.
+# because GitHub runs dist/index.js exactly as it is in the repo. Only main and
+# release branches carry a fresh dist/; work branches merge into dev without it.
 pre-push:
   jobs:
     - name: check-dist
       run: npm run check:dist
+      only:
+        - ref: main
+        - ref: chore/release-*
