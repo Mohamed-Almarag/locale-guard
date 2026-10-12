@@ -45,6 +45,34 @@ describe('parseConfig', () => {
     ])
   })
 
+  it('keeps an ignore-values line whole, so a value can contain commas', () => {
+    const result = parseConfig({
+      files: 'locales/{locale}.json',
+      'ignore-values': 'Visa, Mastercard, Amex\nPayPal'
+    })
+    expect(result.ok && result.config['ignore-values']).toEqual([
+      'Visa, Mastercard, Amex',
+      'Visa',
+      'Mastercard',
+      'Amex',
+      'PayPal'
+    ])
+  })
+
+  it('does not split ignore-values written as a YAML list', () => {
+    const result = parseConfig(
+      {},
+      file({
+        files: ['locales/{locale}.json'],
+        'ignore-values': ['Visa, Mastercard, Amex', 'PayPal']
+      })
+    )
+    expect(result.ok && result.config['ignore-values']).toEqual([
+      'Visa, Mastercard, Amex',
+      'PayPal'
+    ])
+  })
+
   it('explains a wrong value', () => {
     expect(
       parseConfig({ files: 'l/{locale}.json', 'fail-on': 'errors' })

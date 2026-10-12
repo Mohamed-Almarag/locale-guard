@@ -57,6 +57,20 @@ const list = z
       .filter(Boolean)
   )
 
+/**
+ * Values are whole texts that may contain commas ("Visa, Mastercard, Amex"),
+ * so a line is kept whole. Its comma-separated parts are kept too, so
+ * `Google, OK` written on one line still ignores both.
+ */
+const valueList = z
+  .union([z.array(z.string()), z.string()])
+  .transform((value) => {
+    const values = Array.isArray(value)
+      ? value
+      : value.split('\n').flatMap((line) => [line, ...line.split(',')])
+    return [...new Set(values.map((item) => item.trim()).filter(Boolean))]
+  })
+
 const flag = z.union([z.boolean(), z.stringbool()])
 
 export const configSchema = z.strictObject({
@@ -85,7 +99,7 @@ export const configSchema = z.strictObject({
   annotations: flag.default(true),
   'ignore-keys': list.default([]),
   'ignore-locales': list.default([]),
-  'ignore-values': list.default([]),
+  'ignore-values': valueList.default([]),
   'disable-checks': list.pipe(z.array(z.enum(CHECK_IDS))).default([])
 })
 
