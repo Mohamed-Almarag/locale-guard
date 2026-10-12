@@ -55,6 +55,37 @@ describe('untranslated', () => {
     ])
   })
 
+  it('counts the words of one plural branch, so a single word in two forms is left out', async () => {
+    const values = {
+      one: 'ticket | tickets',
+      two: 'open ticket | open tickets',
+      icu: '{count, plural, one {# ticket} other {# tickets}}'
+    }
+    const vueIssues = await run(
+      'untranslated',
+      {
+        'locales/en.json': json({ one: values.one, two: values.two }),
+        'locales/fr.json': json({ one: values.one, two: values.two }),
+        'locales/ar.json': json({ one: values.one, two: 'تذكرة | تذاكر' })
+      },
+      vue
+    )
+    expect(summarize(vueIssues)).toEqual([
+      'ar one:2 `one`: no Arabic letters, looks untranslated',
+      'fr two:3 `two`: same text as en'
+    ])
+
+    const icuIssues = await run(
+      'untranslated',
+      {
+        'locales/en.json': json({ icu: values.icu }),
+        'locales/fr.json': json({ icu: values.icu })
+      },
+      icu
+    )
+    expect(icuIssues).toEqual([])
+  })
+
   it('does not compare variants of the same language', async () => {
     const issues = await run(
       'untranslated',
