@@ -308,4 +308,12 @@ describe('renderReport', () => {
     })
     expect(body).toContain('| A \\| B<br>C |')
   })
+
+  it('escapes a backslash so it cannot cancel the escaped pipe', async () => {
+    const body = await report({
+      'locales/en.json': json({ a: 'A \\| B' }),
+      'locales/ar.json': json({})
+    })
+    expect(body).toContain('| A \\\\\\| B |')
+  })
 })

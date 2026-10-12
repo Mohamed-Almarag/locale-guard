@@ -26,6 +26,8 @@ All notable changes to this project are documented here. The format follows
 - The untranslated check counts the words of one plural branch:
   `ticket | tickets` is one word, not two.
 - File names such as `comments.xlsx` are not reported as untranslated.
+- A value with a backslash before a `|` no longer breaks the table row in the
+  comment.
 
 ## [1.0.3] - 2026-10-10
 
