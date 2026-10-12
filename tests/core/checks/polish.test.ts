@@ -232,6 +232,44 @@ describe('untranslated: values shared by two locales', () => {
     expect(issues).toEqual([])
   })
 
+  it('does not compare Italian with Spanish or Portuguese, which share short phrases', async () => {
+    const issues = await run('untranslated', {
+      'locales/en.json': json({
+        person: 'A person',
+        name: 'Full name',
+        size: 'Extra large'
+      }),
+      'locales/es.json': json({
+        person: 'Una persona',
+        name: 'Nombre completo',
+        size: 'Extra grande'
+      }),
+      'locales/it.json': json({
+        person: 'Una persona',
+        name: 'Nome completo',
+        size: 'Extra grande'
+      }),
+      'locales/pt.json': json({
+        person: 'Uma pessoa',
+        name: 'Nome completo',
+        size: 'Extra grande'
+      })
+    })
+    expect(issues).toEqual([])
+  })
+
+  it('still reports Italian text copied into an unrelated language', async () => {
+    const italian = { person: 'Una persona', size: 'Extra grande' }
+    const issues = await run('untranslated', {
+      'locales/en.json': json({ person: 'A person', size: 'Extra large' }),
+      'locales/it.json': json(italian),
+      'locales/tr.json': json(italian)
+    })
+    expect(summarize(issues)).toEqual([
+      'it locales/it.json:2 it and tr have identical values, so one file was probably copied into the other'
+    ])
+  })
+
   it('does not compare Chinese and Japanese, which share characters', async () => {
     const shared = { title: 'API Key 管理', done: 'Webhook 設定' }
     const issues = await run('untranslated', {
