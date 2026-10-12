@@ -11,7 +11,7 @@ your users.
 It works with **vue-i18n** (and Nuxt), **ICU** messages (next-intl, react-intl)
 and **plain JSON** (i18next, react-i18next), in JSON or YAML files.
 
-<img src="docs/images/raw-key.png" alt="A German page showing the raw key trips.rating instead of a translation" width="400">
+<img src="docs/images/hero.png" alt="Left: a German checkout page showing the raw key checkout.coupon.invalid. Right: the Locale Guard comment on the pull request reporting that key as missing in ar and de, with a copy-paste block" width="800">
 
 A key added to English and forgotten in German shows up like this in production.
 Locale Guard catches it in the pull request instead.
@@ -119,21 +119,22 @@ base file writes each key.
 
 ## Inputs
 
-| Input              | Default               | Description                                                                                                                                                         |
-| ------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `files`            |                       | **Required**, here or in the settings file. Where the locale files are, with `{locale}` in place of the language code. Several patterns can be given, one per line. |
-| `format`           | `json`                | The library that reads your messages. See [Formats](#formats).                                                                                                      |
-| `base-locale`      | `en`                  | The locale every other locale is compared with.                                                                                                                     |
-| `fail-on`          | `error`               | When the check fails: `error`, `warning` or `never`.                                                                                                                |
-| `fail-on-existing` | `false`               | Also fail on issues that existed before the pull request.                                                                                                           |
-| `comment`          | `true`                | Write a single pull request comment that is updated on every run.                                                                                                   |
-| `annotations`      | `true`                | Mark issues on their line in the "Files changed" tab.                                                                                                               |
-| `ignore-keys`      |                       | Key patterns to skip, one per line or comma separated, such as `legacy.*`. Namespaces are part of the key: `billing.*` skips `locales/{locale}/billing.json`.       |
-| `ignore-locales`   |                       | Locales to skip, such as a language that is still being translated.                                                                                                 |
-| `ignore-values`    |                       | Values that may stay untranslated, such as brand names: `Google`, `OK`. Matched against the whole value, ignoring case.                                             |
-| `disable-checks`   |                       | Checks to turn off, by the names in [Checks](#checks).                                                                                                              |
-| `config-file`      | `.localeguard.yml`    | Optional settings file.                                                                                                                                             |
-| `github-token`     | `${{ github.token }}` | Token used to read the pull request and write the comment.                                                                                                          |
+| Input              | Default               | Description                                                                                                                                                                           |
+| ------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `files`            |                       | **Required**, here or in the settings file. Where the locale files are, with `{locale}` in place of the language code. Several patterns can be given, one per line.                   |
+| `format`           | `json`                | The library that reads your messages. See [Formats](#formats).                                                                                                                        |
+| `base-locale`      | `en`                  | The locale every other locale is compared with.                                                                                                                                       |
+| `fail-on`          | `error`               | When the check fails: `error`, `warning` or `never`.                                                                                                                                  |
+| `fail-on-existing` | `false`               | Also fail on issues that existed before the pull request.                                                                                                                             |
+| `check-when`       | `locale-changes`      | `locale-changes` checks only pull requests that change locale files. `always` checks every pull request and lists the existing issues, which fail only with `fail-on-existing: true`. |
+| `comment`          | `true`                | Write a single pull request comment that is updated on every run.                                                                                                                     |
+| `annotations`      | `true`                | Mark issues on their line in the "Files changed" tab.                                                                                                                                 |
+| `ignore-keys`      |                       | Key patterns to skip, one per line or comma separated, such as `legacy.*`. Namespaces are part of the key: `billing.*` skips `locales/{locale}/billing.json`.                         |
+| `ignore-locales`   |                       | Locales to skip, such as a language that is still being translated.                                                                                                                   |
+| `ignore-values`    |                       | Values that may stay untranslated, such as brand names: `Google`, `OK`. One per line, and a line can contain commas. Matched against the whole value, ignoring case.                  |
+| `disable-checks`   |                       | Checks to turn off, by the names in [Checks](#checks).                                                                                                                                |
+| `config-file`      | `.localeguard.yml`    | Optional settings file.                                                                                                                                                               |
+| `github-token`     | `${{ github.token }}` | Token used to read the pull request and write the comment.                                                                                                                            |
 
 ### Settings file
 
@@ -149,7 +150,8 @@ ignore-locales:
   - he
 ignore-values:
   - Google
-  - WhatsApp
+  - Visa, Mastercard, Amex
+  - XL
 disable-checks:
   - extra-keys
 ```
@@ -169,10 +171,25 @@ make it new.
 - The job summary lists every issue.
 - Only new issues are annotated and fail the check, unless
   `fail-on-existing: true`.
+- With `check-when: always`, every pull request is checked and the comment lists
+  the existing issues open, so old problems stay in sight.
 
 The base branch is read through the GitHub API, so `actions/checkout` does not
-need `fetch-depth: 0`. A pull request that changes no locale file and no
-settings file finishes in a few seconds without checking anything.
+need `fetch-depth: 0`. By default, a pull request that changes no locale file
+and no settings file finishes in a few seconds without checking anything.
+
+### Full report on a schedule
+
+To list every issue in the project outside pull requests, run Locale Guard
+weekly or by hand. It writes the full report to the job summary and fails when
+it finds errors.
+
+```yaml
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+```
 
 ## Forks and security
 
