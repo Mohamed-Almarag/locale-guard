@@ -36,6 +36,9 @@ const SCRIPTS: Record<string, { name: string; letters: RegExp }> = {
 
 const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
 const LETTER = /\p{L}/u
+/** A file name such as `comments.xlsx`, often kept the same in every language. */
+const FILE_NAME =
+  /^[^\s/\\]+\.(?:csv|docx?|gif|jpe?g|json|pdf|png|pptx?|svg|txt|webp|xlsx?|xml|zip)$/i
 /** Words that carry meaning, so date formats like "H:mm:ss" are not counted as text. */
 const LONG_WORD = /[\p{L}\p{M}]{3,}/gu
 
@@ -94,6 +97,7 @@ const perValue: Check = (context) => {
       const baseEntry = baseEntryFor(context, key)
       const value = entry.value.trim()
       if (!baseEntry || !value || ignored.has(value.toLowerCase())) continue
+      if (FILE_NAME.test(value)) continue
 
       const text = visibleText(describe, entry.value)
       if (text === undefined || !LETTER.test(text)) continue
