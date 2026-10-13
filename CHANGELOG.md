@@ -14,7 +14,8 @@ All notable changes to this project are documented here. The format follows
   `locale-changes`, keeps the current behavior.
 - An extra key that looks like a base key the locale is missing gets a hint:
   "Did you mean `states.add_state`?". It covers keys in other letter case and
-  one part of the path spelled a little differently.
+  one part of the path spelled a little differently. A space at the edge of a
+  key or of one of its parts is named in the hint, since it cannot be seen.
 
 ### Fixed
 
@@ -26,8 +27,8 @@ All notable changes to this project are documented here. The format follows
 - The untranslated check counts the words of one plural branch:
   `ticket | tickets` is one word, not two.
 - File names such as `comments.xlsx` are not reported as untranslated.
-- A value with a backslash before a `|` no longer breaks the table row in the
-  comment.
+- Backslashes in values now show in the comment table. Before, `\"` showed as
+  `"`.
 
 ## [1.0.3] - 2026-10-10
 
