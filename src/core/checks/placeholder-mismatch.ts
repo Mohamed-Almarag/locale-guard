@@ -1,3 +1,4 @@
+import { showKey } from '../key-label.js'
 import type { Issue } from '../types.js'
 import { type Check, baseEntryFor } from './context.js'
 
@@ -37,7 +38,7 @@ export const placeholderMismatch: Check = (context) => {
         key,
         line: entry.line,
         column: entry.column,
-        message: `\`${key}\`: ${parts.join(', ')}`,
+        message: `${showKey(key)}: ${parts.join(', ')}`,
         baseValue: baseEntry.value,
         isNew: true
       })

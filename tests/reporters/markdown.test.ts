@@ -316,4 +316,15 @@ describe('renderReport', () => {
     })
     expect(body).toContain('| A \\\\\\| B |')
   })
+
+  it('names a space in a missing key in the table and keeps it in the copy-paste block', async () => {
+    const body = await report({
+      'locales/en.json': json({ deals: { 'attitude ': 'Attitude' } }),
+      'locales/ar.json': json({})
+    })
+    expect(body).toContain(
+      '| [`deals.attitude ` (with a space at the end)](https://x/locales/en.json#L3) | Attitude |'
+    )
+    expect(body).toContain('"attitude ": ""')
+  })
 })

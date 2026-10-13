@@ -1,3 +1,4 @@
+import { showKey } from '../key-label.js'
 import type { Issue } from '../types.js'
 import type { Check } from './context.js'
 
@@ -17,7 +18,7 @@ export const emptyValues: Check = ({ base, targets }) => {
         key,
         line: entry.line,
         column: entry.column,
-        message: `Empty value for \`${key}\``,
+        message: `Empty value for ${showKey(key)}`,
         baseValue: locale === base ? undefined : base.entries.get(key)?.value,
         isNew: true
       })
