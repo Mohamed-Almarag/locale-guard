@@ -160,6 +160,26 @@ describe('extra-keys', () => {
     ])
   })
 
+  it('names a space at the edge of the suggested key, since it cannot be seen', async () => {
+    const issues = await run('extra-keys', {
+      'locales/en.json': json({ deals: { 'attitude ': 'Attitude' } }),
+      'locales/tr.json': json({ deals: { attitude: 'Tutum' } })
+    })
+    expect(issues.map((issue) => issue.hint)).toEqual([
+      'Did you mean `deals.attitude ` (with a space at the end)?'
+    ])
+  })
+
+  it('names a space at the edge of the extra key itself', async () => {
+    const issues = await run('extra-keys', {
+      'locales/en.json': json({ deals: { attitude: 'Attitude' } }),
+      'locales/tr.json': json({ deals: { ' attitude': 'Tutum' } })
+    })
+    expect(issues.map((issue) => issue.hint)).toEqual([
+      'Did you mean `deals.attitude` (without the space next to a dot)?'
+    ])
+  })
+
   it('does not suggest a key the locale already has, or an unrelated one', async () => {
     const issues = await run('extra-keys', {
       'locales/en.json': json({ menu: { save: 'Save', home: 'Home' } }),
