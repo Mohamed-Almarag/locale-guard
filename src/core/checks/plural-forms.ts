@@ -1,3 +1,4 @@
+import { showKey } from '../key-label.js'
 import type { Issue, Locale } from '../types.js'
 import { intlLocale } from '../locale-code.js'
 import { languageName, requiredCategories } from '../plural-rules.js'
@@ -36,8 +37,8 @@ function icuPlurals({ base, targets, describe }: CheckContext): Issue[] {
           issue(locale, key, entry, {
             severity: needsOther ? 'error' : 'warning',
             message: needsOther
-              ? `\`${key}\`: \`{${plural.argument}, ${plural.ordinal ? 'selectordinal' : 'plural'}}\` has no \`other\` form, which ICU requires`
-              : `\`${key}\`: ${languageName(code)} uses ${required.join(', ')}. Missing: ${missing.join(', ')}`,
+              ? `${showKey(key)}: \`{${plural.argument}, ${plural.ordinal ? 'selectordinal' : 'plural'}}\` has no \`other\` form, which ICU requires`
+              : `${showKey(key)}: ${languageName(code)} uses ${required.join(', ')}. Missing: ${missing.join(', ')}`,
             baseValue:
               locale === base ? undefined : base.entries.get(key)?.value
           })
@@ -70,7 +71,7 @@ function suffixPlurals({ base, targets, plurals }: CheckContext): Issue[] {
       issues.push(
         issue(locale, plural.stem, entry, {
           severity: missing.includes('other') ? 'error' : 'warning',
-          message: `\`${plural.stem}\`: ${languageName(code)} uses ${needed.join(', ')}. Missing: ${missing.map((category) => `\`${keyFor(plural, category)}\``).join(', ')}`,
+          message: `${showKey(plural.stem)}: ${languageName(code)} uses ${needed.join(', ')}. Missing: ${missing.map((category) => showKey(keyFor(plural, category))).join(', ')}`,
           baseValue:
             locale === base
               ? undefined

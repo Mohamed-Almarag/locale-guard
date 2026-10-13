@@ -1,3 +1,4 @@
+import { showKey } from '../key-label.js'
 import type { Issue } from '../types.js'
 import type { Check } from './context.js'
 
@@ -18,7 +19,7 @@ export const invalidSyntax: Check = ({ base, targets, describe }) => {
         key,
         line: entry.line,
         column: entry.column,
-        message: `\`${key}\`: ${error}`,
+        message: `${showKey(key)}: ${error}`,
         baseValue: locale === base ? undefined : base.entries.get(key)?.value,
         isNew: true
       })

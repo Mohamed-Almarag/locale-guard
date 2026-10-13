@@ -1,3 +1,4 @@
+import { showKey } from '../key-label.js'
 import type { Issue } from '../types.js'
 import { type Check, isBroken } from './context.js'
 
@@ -24,7 +25,7 @@ export const brokenLinkedMessages: Check = ({
           key,
           line: entry.line,
           column: entry.column,
-          message: `\`${key}\` links to \`@:${linked}\`, which does not exist in ${locale.code}`,
+          message: `${showKey(key)} links to \`@:${linked}\`, which does not exist in ${locale.code}`,
           isNew: true
         })
       }

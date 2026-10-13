@@ -1,5 +1,6 @@
 import { stringify as toYaml } from 'yaml'
 import { namespaceOf } from '../core/checks/context.js'
+import { showKey } from '../core/key-label.js'
 import { PLURAL_CATEGORIES } from '../core/plural-rules.js'
 import type { CheckId, Issue, Locale, Project } from '../core/types.js'
 
@@ -216,7 +217,7 @@ function renderSharedMissingKeys(
   for (const issue of first) {
     const entry = base?.entries.get(issue.key)
     const url = entry ? input.link?.(entry.file, entry.line) : undefined
-    const key = `\`${issue.key}\``
+    const key = showKey(issue.key)
     out += `| ${url ? `[${key}](${url})` : key} | ${cell(issue.baseValue ?? '')} |\n`
   }
 
@@ -255,7 +256,7 @@ function location(issue: Issue, input: ReportInput): string {
 // Links to the parent object in the locale file, or to the base key when it has none
 function missingKeyLink(issue: Issue, input: ReportInput): string {
   const { project } = input
-  const label = `\`${issue.key}\``
+  const label = showKey(issue.key)
   const target = project.locales.get(issue.locale)
   const inTarget =
     target?.files.some((file) => file.path === issue.file) &&

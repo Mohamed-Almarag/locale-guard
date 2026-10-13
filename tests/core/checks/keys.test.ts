@@ -160,7 +160,7 @@ describe('extra-keys', () => {
     ])
   })
 
-  it('names a space at the edge of the suggested key, since it cannot be seen', async () => {
+  it('names a space at the end of the suggested key, since it cannot be seen', async () => {
     const issues = await run('extra-keys', {
       'locales/en.json': json({ deals: { 'attitude ': 'Attitude' } }),
       'locales/tr.json': json({ deals: { attitude: 'Tutum' } })
@@ -170,13 +170,26 @@ describe('extra-keys', () => {
     ])
   })
 
-  it('names a space at the edge of the extra key itself', async () => {
+  it('names a space at the end of the extra key itself', async () => {
     const issues = await run('extra-keys', {
       'locales/en.json': json({ deals: { attitude: 'Attitude' } }),
-      'locales/tr.json': json({ deals: { ' attitude': 'Tutum' } })
+      'locales/tr.json': json({ deals: { 'attitude ': 'Tutum' } })
     })
-    expect(issues.map((issue) => issue.hint)).toEqual([
-      'Did you mean `deals.attitude` (without the space next to a dot)?'
+    expect(issues.map((issue) => [issue.message, issue.hint])).toEqual([
+      [
+        'Key `deals.attitude ` (with a space at the end) does not exist in en',
+        'Did you mean `deals.attitude`?'
+      ]
+    ])
+  })
+
+  it('names a space in a missing key', async () => {
+    const issues = await run('missing-keys', {
+      'locales/en.json': json({ deals: { 'attitude ': 'Attitude' } }),
+      'locales/fr.json': json({})
+    })
+    expect(issues.map((issue) => issue.message)).toEqual([
+      'Missing key `deals.attitude ` (with a space at the end)'
     ])
   })
 
