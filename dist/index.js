@@ -71399,6 +71399,24 @@ function swapLocale(path, from, to) {
         .join('/');
 }
 
+// Characters that take no space on screen, including direction marks
+const INVISIBLE = /[\u00AD\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/;
+// What a reader cannot see in a key: an invisible character, or a space at its start or end
+function invisibleNote(key) {
+    if (INVISIBLE.test(key))
+        return 'with an invisible character';
+    if (/\s$/.test(key))
+        return 'with a space at the end';
+    if (/^\s/.test(key))
+        return 'with a space at the start';
+    return undefined;
+}
+// A key in backticks, followed by a note when part of it cannot be seen
+function showKey(key) {
+    const note = invisibleNote(key);
+    return note ? `\`${key}\` (${note})` : `\`${key}\``;
+}
+
 // `@:common.save` pointing to a key the locale does not have
 const brokenLinkedMessages = ({ format, base, targets, describe }) => {
     if (format !== 'vue-i18n')
@@ -71417,7 +71435,7 @@ const brokenLinkedMessages = ({ format, base, targets, describe }) => {
                     key,
                     line: entry.line,
                     column: entry.column,
-                    message: `\`${key}\` links to \`@:${linked}\`, which does not exist in ${locale.code}`,
+                    message: `${showKey(key)} links to \`@:${linked}\`, which does not exist in ${locale.code}`,
                     isNew: true
                 });
             }
@@ -71441,7 +71459,7 @@ const emptyValues = ({ base, targets }) => {
                 key,
                 line: entry.line,
                 column: entry.column,
-                message: `Empty value for \`${key}\``,
+                message: `Empty value for ${showKey(key)}`,
                 baseValue: locale === base ? undefined : base.entries.get(key)?.value,
                 isNew: true
             });
@@ -71468,10 +71486,8 @@ const extraKeys = ({ base, targets, plurals }) => {
                 key,
                 line: entry.line,
                 column: entry.column,
-                message: `Key \`${key}\` does not exist in ${base.code}`,
-                hint: meant
-                    ? `Did you mean \`${meant}\`${spaceNote(key, meant)}?`
-                    : undefined,
+                message: `Key ${showKey(key)} does not exist in ${base.code}`,
+                hint: meant ? `Did you mean ${showKey(meant)}?` : undefined,
                 isNew: true
             });
         }
@@ -71498,21 +71514,6 @@ function meantKey(key, base, target) {
         }
     }
     return matches.length === 1 ? matches[0] : undefined;
-}
-// A space at the edge of a key part cannot be seen in the comment
-function spaceNote(key, meant) {
-    const where = (k) => /\s$/.test(k)
-        ? 'at the end'
-        : /^\s/.test(k)
-            ? 'at the start'
-            : /\s\.|\.\s/.test(k)
-                ? 'next to a dot'
-                : undefined;
-    const inMeant = where(meant);
-    if (inMeant)
-        return ` (with a space ${inMeant})`;
-    const inKey = where(key);
-    return inKey ? ` (without the space ${inKey})` : '';
 }
 // Long enough that a small difference is not chance
 function isTypo(a, b) {
@@ -71549,7 +71550,7 @@ const invalidSyntax = ({ base, targets, describe }) => {
                 key,
                 line: entry.line,
                 column: entry.column,
-                message: `\`${key}\`: ${error}`,
+                message: `${showKey(key)}: ${error}`,
                 baseValue: locale === base ? undefined : base.entries.get(key)?.value,
                 isNew: true
             });
@@ -71603,7 +71604,7 @@ function missing(target, base, key, baseEntry) {
         key,
         line: anchor.line,
         column: anchor.column,
-        message: `Missing key \`${key}\``,
+        message: `Missing key ${showKey(key)}`,
         baseValue: baseEntry.value,
         isNew: true
     };
@@ -71642,7 +71643,7 @@ const placeholderMismatch = (context) => {
                 key,
                 line: entry.line,
                 column: entry.column,
-                message: `\`${key}\`: ${parts.join(', ')}`,
+                message: `${showKey(key)}: ${parts.join(', ')}`,
                 baseValue: baseEntry.value,
                 isNew: true
             });
@@ -71684,8 +71685,8 @@ function icuPlurals({ base, targets, describe }) {
                 issues.push(issue$1(locale, key, entry, {
                     severity: needsOther ? 'error' : 'warning',
                     message: needsOther
-                        ? `\`${key}\`: \`{${plural.argument}, ${plural.ordinal ? 'selectordinal' : 'plural'}}\` has no \`other\` form, which ICU requires`
-                        : `\`${key}\`: ${languageName(code)} uses ${required.join(', ')}. Missing: ${missing.join(', ')}`,
+                        ? `${showKey(key)}: \`{${plural.argument}, ${plural.ordinal ? 'selectordinal' : 'plural'}}\` has no \`other\` form, which ICU requires`
+                        : `${showKey(key)}: ${languageName(code)} uses ${required.join(', ')}. Missing: ${missing.join(', ')}`,
                     baseValue: locale === base ? undefined : base.entries.get(key)?.value
                 }));
             }
@@ -71714,7 +71715,7 @@ function suffixPlurals({ base, targets, plurals }) {
                 continue;
             issues.push(issue$1(locale, plural.stem, entry, {
                 severity: missing.includes('other') ? 'error' : 'warning',
-                message: `\`${plural.stem}\`: ${languageName(code)} uses ${needed.join(', ')}. Missing: ${missing.map((category) => `\`${keyFor(plural, category)}\``).join(', ')}`,
+                message: `${showKey(plural.stem)}: ${languageName(code)} uses ${needed.join(', ')}. Missing: ${missing.map((category) => showKey(keyFor(plural, category))).join(', ')}`,
                 baseValue: locale === base
                     ? undefined
                     : base.entries.get(keyFor(plural, 'other'))?.value
@@ -71816,10 +71817,10 @@ const perValue = (context) => {
             if (language !== baseLanguage &&
                 value === baseEntry.value.trim() &&
                 wordCount(shown) >= 2) {
-                message = `\`${key}\`: same text as ${base.code}`;
+                message = `${showKey(key)}: same text as ${base.code}`;
             }
             else if (script && !script.letters.test(text)) {
-                message = `\`${key}\`: no ${script.name} letters, looks untranslated`;
+                message = `${showKey(key)}: no ${script.name} letters, looks untranslated`;
             }
             if (!message)
                 continue;
@@ -71878,7 +71879,7 @@ const sharedValues = ({ base, targets, describe, ignoreValues }) => {
                 line: entry.line,
                 column: entry.column,
                 message: `${first.code} and ${second.code} have identical values, so one file was probably copied into the other`,
-                details: shared.map((key) => `\`${key}\`: ${first.entries.get(key)?.value.trim()}`),
+                details: shared.map((key) => `${showKey(key)}: ${first.entries.get(key)?.value.trim()}`),
                 isNew: true
             });
         }
@@ -87139,7 +87140,7 @@ function renderSharedMissingKeys(group, input, heading) {
     for (const issue of first) {
         const entry = base?.entries.get(issue.key);
         const url = entry ? input.link?.(entry.file, entry.line) : undefined;
-        const key = `\`${issue.key}\``;
+        const key = showKey(issue.key);
         out += `| ${url ? `[${key}](${url})` : key} | ${cell(issue.baseValue ?? '')} |\n`;
     }
     for (const [file, fileIssues] of byFile(first)) {
@@ -87167,7 +87168,7 @@ function location(issue, input) {
 // Links to the parent object in the locale file, or to the base key when it has none
 function missingKeyLink(issue, input) {
     const { project } = input;
-    const label = `\`${issue.key}\``;
+    const label = showKey(issue.key);
     const target = project.locales.get(issue.locale);
     const inTarget = target?.files.some((file) => file.path === issue.file) &&
         hasParent(target, issue.key);
