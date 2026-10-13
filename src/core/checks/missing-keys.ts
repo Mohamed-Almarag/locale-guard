@@ -1,3 +1,4 @@
+import { showKey } from '../key-label.js'
 import type { Entry, Issue, Locale } from '../types.js'
 import {
   type Check,
@@ -59,7 +60,7 @@ function missing(
     key,
     line: anchor.line,
     column: anchor.column,
-    message: `Missing key \`${key}\``,
+    message: `Missing key ${showKey(key)}`,
     baseValue: baseEntry.value,
     isNew: true
   }

@@ -1,4 +1,5 @@
 import { wordCount } from '../formats/message.js'
+import { showKey } from '../key-label.js'
 import { languageOf } from '../locale-code.js'
 import type { Entry, Issue, Locale } from '../types.js'
 import { type Check, type CheckContext, baseEntryFor } from './context.js'
@@ -93,9 +94,9 @@ const perValue: Check = (context) => {
         value === baseEntry.value.trim() &&
         wordCount(shown) >= 2
       ) {
-        message = `\`${key}\`: same text as ${base.code}`
+        message = `${showKey(key)}: same text as ${base.code}`
       } else if (script && !script.letters.test(text)) {
-        message = `\`${key}\`: no ${script.name} letters, looks untranslated`
+        message = `${showKey(key)}: no ${script.name} letters, looks untranslated`
       }
       if (!message) continue
 
@@ -157,7 +158,7 @@ const sharedValues: Check = ({ base, targets, describe, ignoreValues }) => {
         column: entry.column,
         message: `${first.code} and ${second.code} have identical values, so one file was probably copied into the other`,
         details: shared.map(
-          (key) => `\`${key}\`: ${first.entries.get(key)?.value.trim()}`
+          (key) => `${showKey(key)}: ${first.entries.get(key)?.value.trim()}`
         ),
         isNew: true
       })
