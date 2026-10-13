@@ -71469,7 +71469,9 @@ const extraKeys = ({ base, targets, plurals }) => {
                 line: entry.line,
                 column: entry.column,
                 message: `Key \`${key}\` does not exist in ${base.code}`,
-                hint: meant ? `Did you mean \`${meant}\`?` : undefined,
+                hint: meant
+                    ? `Did you mean \`${meant}\`${spaceNote(key, meant)}?`
+                    : undefined,
                 isNew: true
             });
         }
@@ -71496,6 +71498,21 @@ function meantKey(key, base, target) {
         }
     }
     return matches.length === 1 ? matches[0] : undefined;
+}
+// A space at the edge of a key part cannot be seen in the comment
+function spaceNote(key, meant) {
+    const where = (k) => /\s$/.test(k)
+        ? 'at the end'
+        : /^\s/.test(k)
+            ? 'at the start'
+            : /\s\.|\.\s/.test(k)
+                ? 'next to a dot'
+                : undefined;
+    const inMeant = where(meant);
+    if (inMeant)
+        return ` (with a space ${inMeant})`;
+    const inKey = where(key);
+    return inKey ? ` (without the space ${inKey})` : '';
 }
 // Long enough that a small difference is not chance
 function isTypo(a, b) {
