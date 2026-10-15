@@ -265,6 +265,12 @@ breaks a message, and values copied from one language's file into another's.
 - Locale Guard does not know which keys your code uses, so it does not report
   unused keys or keys that the code uses but no file defines.
 
+## Contributing
+
+Bug reports and false positives are welcome. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and report
+security issues privately as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
 [MIT](LICENSE)
