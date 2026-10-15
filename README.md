@@ -11,6 +11,8 @@ your users.
 It works with **vue-i18n** (and Nuxt), **ICU** messages (next-intl, react-intl)
 and **plain JSON** (i18next, react-i18next), in JSON or YAML files.
 
+<img src="docs/images/demo.gif" alt="Demo: the Locale Guard comment and line annotations on a Nuxt pull request, the ICU errors it reports on a Next.js pull request, and the supported libraries" width="800">
+
 <img src="docs/images/hero.png" alt="Left: a German checkout page showing the raw key checkout.coupon.invalid. Right: the Locale Guard comment on the pull request reporting that key as missing in ar and de, with a copy-paste block" width="800">
 
 A key added to English and forgotten in German shows up like this in production.
