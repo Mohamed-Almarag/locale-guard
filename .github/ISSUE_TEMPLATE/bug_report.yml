@@ -1,0 +1,80 @@
+name: Bug report
+description: A wrong result, a missed issue or a crash
+labels: [bug]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What went wrong?
+      options:
+        - It reported something that is not a problem (false positive)
+        - It missed a real problem
+        - The action failed or crashed
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description:
+        What you put after `@` in `uses:`, e.g. `v1`, `v1.1.0` or a commit.
+      placeholder: v1
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: Format
+      description: The `format` input in your workflow.
+      options:
+        - vue-i18n
+        - '@nuxtjs/i18n'
+        - next-intl
+        - use-intl
+        - react-intl
+        - formatjs
+        - icu
+        - i18next
+        - react-i18next
+        - next-i18next
+        - i18next-vue
+        - json
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow
+      description: The Locale Guard step from your workflow file.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: messages
+    attributes:
+      label: Key and values
+      description:
+        The key, its value in the base locale and its value in the other locale.
+      placeholder: |
+        key: cart.items
+        en: "{count} items"
+        fr: "{nombre} articles"
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual result
+      description:
+        What you expected, and what Locale Guard reported. Paste the message
+        from the comment or the log.
+    validations:
+      required: true
+  - type: input
+    id: run
+    attributes:
+      label: Link to the run
+      description:
+        Optional. A link to the workflow run or the pull request, if it is
+        public.
