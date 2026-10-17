@@ -377,11 +377,12 @@ describe('Rails plural forms: placeholders', () => {
 
 describe('plural rules', () => {
   it('skips plural forms of a language Intl has no rules for', async () => {
-    // `new Intl.PluralRules('ie')` would quietly use the machine's language
+    // `qaa` is reserved for private use, so no Intl version has its rules
     const project = await load({
       'locales/en.json': json({ items_one: 'One', items_other: 'Many' }),
-      'locales/ie.json': json({ items_other: 'Multi' })
+      'locales/qaa.json': json({ items_other: 'Multi' })
     })
+    expect(project.locales.has('qaa')).toBe(true)
     expect(
       analyze(project, { format: 'json' }).filter(
         (issue) => issue.check === 'plural-forms'
