@@ -1,6 +1,7 @@
 import { stringify as toYaml } from 'yaml'
 import { namespaceOf } from '../core/checks/context.js'
 import { showKey } from '../core/key-label.js'
+import { replaceLocale } from '../core/locale-code.js'
 import { PLURAL_CATEGORIES } from '../core/plural-rules.js'
 import type { CheckId, Issue, Locale, Project } from '../core/types.js'
 
@@ -32,7 +33,7 @@ const LABELS: Record<CheckId, [singular: string, plural: string]> = {
 
 const CHECK_ORDER = Object.keys(LABELS) as CheckId[]
 const PLURAL_SUFFIX = new RegExp(
-  `_(ordinal_)?(?:${PLURAL_CATEGORIES.filter((c) => c !== 'other').join('|')})$`
+  `([_.])(ordinal_)?(?:${PLURAL_CATEGORIES.filter((c) => c !== 'other').join('|')})$`
 )
 const RESERVED = 400
 
@@ -154,7 +155,7 @@ function mergeMissingKeys(groups: Group[]): Group[] {
     const same = bySignature.get(signature)
     if (same) {
       same.locales.push(group.locale)
-      same.issues.push(...group.issues)
+      for (const issue of group.issues) same.issues.push(issue)
     } else {
       const copy = {
         ...group,
@@ -222,28 +223,23 @@ function renderSharedMissingKeys(
   }
 
   for (const [file, fileIssues] of byFile(first)) {
+    const under = rootKey(project, group.locale, file)
+      ? ', under each locale key'
+      : ''
     out += copyPasteBlock(
-      `Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale)`,
+      `Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale${under})`,
       file,
       fileIssues,
-      project
+      project,
+      false
     )
   }
   return out
 }
 
-// `locales/ar/common.json` -> `locales/{locale}/common.json`
+// `locales/ar/common.json` -> `locales/{locale}/common.json`, `main-ar.json` -> `main-{locale}.json`
 function withLocalePlaceholder(path: string, locale: string): string {
-  return path
-    .split('/')
-    .map((segment) =>
-      segment === locale
-        ? '{locale}'
-        : segment.startsWith(`${locale}.`)
-          ? `{locale}${segment.slice(locale.length)}`
-          : segment
-    )
-    .join('/')
+  return replaceLocale(path, locale, '{locale}')
 }
 
 function location(issue: Issue, input: ReportInput): string {
@@ -285,7 +281,7 @@ function hasParent(locale: Locale, key: string): boolean {
 function baseEntryOf(base: Locale | undefined, key: string) {
   return (
     base?.entries.get(key) ??
-    base?.entries.get(key.replace(PLURAL_SUFFIX, '_$1other'))
+    base?.entries.get(key.replace(PLURAL_SUFFIX, '$1$2other'))
   )
 }
 
@@ -301,16 +297,35 @@ function copyPasteBlock(
   summary: string,
   file: string,
   issues: Issue[],
-  project: Project
+  project: Project,
+  wrap = true
 ): string {
   const base = project.locales.get(project.baseLocale)
+  const root = wrap
+    ? rootKey(project, issues[0]?.locale ?? '', file)
+    : undefined
   const tree: Record<string, unknown> = {}
   for (const issue of issues) {
-    setPath(tree, pathInFile(base, issue.key), '')
+    const path = pathInFile(base, issue.key)
+    setPath(tree, root ? [root, ...path] : path, '')
   }
   const yaml = /\.ya?ml$/i.test(file)
   const code = yaml ? toYaml(tree).trimEnd() : JSON.stringify(tree, null, 2)
   return `\n<details><summary>📋 ${summary}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`
+}
+
+// The file's locale key, or the locale for a file not created yet when the base has one
+function rootKey(
+  project: Project,
+  locale: string,
+  file: string
+): string | undefined {
+  const own = project.locales
+    .get(locale)
+    ?.files.find((localeFile) => localeFile.path === file)
+  if (own) return own.root
+  const base = project.locales.get(project.baseLocale)
+  return base?.files.some((baseFile) => baseFile.root) ? locale : undefined
 }
 
 // The key without its file's namespace

@@ -40,6 +40,7 @@ const COMMENT_LIMIT = 65_000
 const INPUTS = [
   'format',
   'base-locale',
+  'base-file',
   'files',
   'fail-on',
   'fail-on-existing',
@@ -116,6 +117,12 @@ async function check(
 
   if (!project.locales.has(baseLocale)) {
     const found = [...project.locales.keys()]
+    if (config['base-file']) {
+      core.setFailed(
+        `Base file "${config['base-file']}" was not found. Check "base-file".`
+      )
+      return
+    }
     core.setFailed(
       found.length
         ? `Base locale "${baseLocale}" was not found. Found: ${found.join(', ')}. Check "base-locale" and "files".`
@@ -189,7 +196,9 @@ async function analyzeBase(
       octokit,
       context.repo,
       pr.baseSha,
-      config.files
+      config['base-file']
+        ? [...config.files, config['base-file']]
+        : config.files
     )
     const project = await loadProject(source, loadOptions(config))
     return analyze(project, analyzeOptions(config))
@@ -205,6 +214,7 @@ function loadOptions(config: Config): LoadOptions {
   return {
     patterns: config.files,
     baseLocale: config['base-locale'],
+    baseFile: config['base-file'],
     ignoreLocales: config['ignore-locales']
   }
 }
@@ -243,7 +253,11 @@ async function skipPullRequest(
   if (!pr) return false
   try {
     const changed = await listChangedFiles(octokit, context.repo, pr.number)
-    if (touchesLocales(changed, config.files, [configPath])) return false
+    const extra = [
+      configPath,
+      ...(config['base-file'] ? [config['base-file']] : [])
+    ]
+    if (touchesLocales(changed, config.files, extra)) return false
     // A previous comment may show stale issues, so run again
     return !(
       config.comment && (await findComment(octokit, context.repo, pr.number))

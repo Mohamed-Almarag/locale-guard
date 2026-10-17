@@ -69943,8 +69943,9 @@ function humanize(code) {
     return code.toLowerCase().replace(/_/g, ' ');
 }
 
-// `{{name}}` (i18next, spaces allowed) and `{name}` (most other libraries)
-const PLACEHOLDER = /\{\{\s*([\w.-]+)\s*\}\}|\{([\w.-]+)\}/g;
+// `{{name}}` (i18next, spaces allowed) and `{name}` (most other libraries).
+// Any script, so a translated name like `{الاسم}` shows as unexpected
+const PLACEHOLDER = /\{\{\s*([\p{L}\p{M}\p{N}_.-]+)\s*\}\}|\{([\p{L}\p{M}\p{N}_.-]+)\}/gu;
 // Plain JSON has no grammar, so placeholders are found with a pattern
 function describePlainMessage(source) {
     const placeholders = [];
@@ -69960,7 +69961,7 @@ function describePlainMessage(source) {
 }
 
 /*!
-  * shared v11.4.13
+  * shared v11.4.14
   * (c) 2026 kazuya kawaguchi
   * Released under the MIT License.
   */
@@ -69987,7 +69988,7 @@ const assign = Object.assign;
 const isObject$1 = (val) => val !== null && typeof val === 'object';
 
 /*!
-  * message-compiler v11.4.13
+  * message-compiler v11.4.14
   * (c) 2026 kazuya kawaguchi
   * Released under the MIT License.
   */
@@ -71230,6 +71231,25 @@ function intlLocale(code) {
         return undefined;
     }
 }
+// A 2 or 3 letter language, as every real locale has: Intl alone accepts
+// `themes` as a 6 letter language
+function isLocaleCode(code) {
+    return Boolean(intlLocale(code)) && /^[a-z]{2,3}$/i.test(languageOf(code));
+}
+// Undefined when Intl has no plural rules for it: `new Intl.PluralRules('qaa')`
+// would quietly use the machine's language instead
+function pluralLocale(code) {
+    const locale = intlLocale(code);
+    return locale && Intl.PluralRules.supportedLocalesOf(locale).length
+        ? locale
+        : undefined;
+}
+// The code wherever it stands alone in the path: `locales/ar/x.json`,
+// `devise.ar.yml`, `main-ar.json`
+function replaceLocale(path, from, to) {
+    const code = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return path.replace(new RegExp(`(^|[/._-])${code}(?=$|[/._-])`, 'g'), (_, before) => `${before}${to}`);
+}
 
 // In CLDR order
 const PLURAL_CATEGORIES = ['zero', 'one', 'two', 'few', 'many', 'other'];
@@ -71258,22 +71278,46 @@ function languageName(code) {
         return code;
     }
 }
+const singleCache = new Map();
+// True when the form covers one whole number, like Hebrew `one` (1) or Arabic
+// `two` (2), so the number may be written in words. Belarusian `one` (1, 21, 31…) is not
+function singleNumber(locale, category) {
+    const id = `${locale}|${category}`;
+    const cached = singleCache.get(id);
+    if (cached !== undefined)
+        return cached;
+    const rules = new Intl.PluralRules(locale);
+    let count = 0;
+    for (let n = 0; n <= 1000 && count < 2; n++) {
+        if (rules.select(n) === category)
+            count++;
+    }
+    singleCache.set(id, count === 1);
+    return count === 1;
+}
 
 const SUFFIX = new RegExp(`^(.+?)_(ordinal_)?(${PLURAL_CATEGORIES.join('|')})$`);
-// A stem is a plural group only when the base has its `other` form
+// Rails: `items: { one: ..., other: ... }`
+const NESTED = new RegExp(`^(.+)\\.(${PLURAL_CATEGORIES.join('|')})$`);
+// A stem is a plural group only when the base has its `other` form. A Rails
+// group also needs YAML files wrapped in their locale, and only forms under it
 class SuffixPlurals {
     groups = new Set();
     constructor(base) {
+        const nested = base.files.some((file) => file.root && /\.ya?ml$/i.test(file.path));
         for (const key of base.entries.keys()) {
-            const plural = parse$3(key);
-            if (plural?.category === 'other')
+            for (const plural of parse$3(key, nested)) {
+                if (plural.category !== 'other')
+                    continue;
+                if (plural.separator === '.' && !onlyForms(base, plural.stem))
+                    continue;
                 this.groups.add(groupId(plural));
+            }
         }
     }
     // Undefined when the key's stem is not a plural group
     of(key) {
-        const plural = parse$3(key);
-        return plural && this.groups.has(groupId(plural)) ? plural : undefined;
+        return parse$3(key, true).find((plural) => this.groups.has(groupId(plural)));
     }
     // Category -> key
     forms(locale, plural) {
@@ -71296,9 +71340,9 @@ class SuffixPlurals {
         return [...seen.values()];
     }
 }
-// `cart.items` + `few` -> `cart.items_few`
+// `cart.items` + `few` -> `cart.items_few`, or `cart.items.few` in Rails
 function keyFor(plural, category) {
-    return `${plural.stem}_${plural.ordinal ? 'ordinal_' : ''}${category}`;
+    return `${plural.stem}${plural.separator}${plural.ordinal ? 'ordinal_' : ''}${category}`;
 }
 // The same form, else `other`, else any form the base has
 function baseKeyFor(base, plural) {
@@ -71310,23 +71354,45 @@ function baseKeyFor(base, plural) {
     }
     return keyFor(plural, 'other');
 }
-// Undefined for an unknown locale code
+// Undefined for an unknown locale code, or one without plural rules in Intl
 function neededForms(code, ordinal) {
-    const locale = intlLocale(code);
+    const locale = pluralLocale(code);
     return locale ? requiredCategories(locale, ordinal) : undefined;
 }
-function parse$3(key) {
-    const match = SUFFIX.exec(key);
-    if (!match)
-        return undefined;
-    return {
-        stem: match[1],
-        ordinal: Boolean(match[2]),
-        category: match[3]
-    };
+function parse$3(key, nested) {
+    const found = [];
+    const suffix = SUFFIX.exec(key);
+    if (suffix) {
+        found.push({
+            stem: suffix[1],
+            ordinal: Boolean(suffix[2]),
+            category: suffix[3],
+            separator: '_'
+        });
+    }
+    const child = nested ? NESTED.exec(key) : null;
+    if (child) {
+        found.push({
+            stem: child[1],
+            ordinal: false,
+            category: child[2],
+            separator: '.'
+        });
+    }
+    return found;
+}
+// Every base key under the stem is a plural form
+function onlyForms(base, stem) {
+    for (const key of base.entries.keys()) {
+        if (!key.startsWith(`${stem}.`))
+            continue;
+        if (!PLURAL_CATEGORIES.includes(key.slice(stem.length + 1)))
+            return false;
+    }
+    return true;
 }
 function groupId(plural) {
-    return `${plural.stem}|${plural.ordinal}`;
+    return `${plural.stem}|${plural.separator}|${plural.ordinal}`;
 }
 
 function createContext(project, format, ignoreValues = []) {
@@ -71369,13 +71435,22 @@ function isBroken(locale, key) {
 }
 // Falls back to the base file's path with the locale swapped, for files not created yet
 function expectedFile(target, base, key) {
+    // The base key's own file, e.g. Rails devise.en.yml -> devise.ar.yml
+    const own = base.entries.get(key)?.file;
+    const mirror = own && replaceLocale(own, base.code, target.code);
+    if (mirror && target.files.some((file) => file.path === mirror))
+        return mirror;
+    // A Rails file the locale does not have yet: devise.ar.yml, to create
+    const rails = base.files.some((file) => file.path === own && file.root);
+    if (mirror && rails && mirror !== own)
+        return mirror;
     const namespace = namespaceOf(base, key);
     const existing = target.files.find((file) => file.namespace === namespace);
     if (existing)
         return existing.path;
     const baseFile = base.files.find((file) => file.namespace === namespace);
     return baseFile
-        ? swapLocale(baseFile.path, base.code, target.code)
+        ? replaceLocale(baseFile.path, base.code, target.code)
         : (target.files[0]?.path ?? '');
 }
 // The closest existing parent of a missing key
@@ -71387,16 +71462,6 @@ function anchorFor(locale, key) {
             return { line: node.line, column: node.column };
     }
     return { line: 1, column: 1 };
-}
-function swapLocale(path, from, to) {
-    return path
-        .split('/')
-        .map((segment) => segment === from
-        ? to
-        : segment.startsWith(`${from}.`)
-            ? to + segment.slice(from.length)
-            : segment)
-        .join('/');
 }
 
 // Characters that take no space on screen, including direction marks
@@ -71623,12 +71688,35 @@ const placeholderMismatch = (context) => {
             const actual = describe(entry.value);
             if (expected.error || actual.error)
                 continue;
-            const plural = Boolean(plurals?.of(key));
-            const comparable = (p) => isComparable(p) && !(plural && COUNT.has(p));
-            const want = expected.placeholders.filter(comparable);
+            const form = plurals?.of(key);
+            const comparable = (p) => isComparable(p) && !(form && COUNT.has(p));
             const have = actual.placeholders.filter(comparable);
-            const missing = want.filter((p) => !have.includes(p));
-            const unexpected = have.filter((p) => !want.includes(p));
+            let missing;
+            let unexpected;
+            if (form?.separator === '.') {
+                // Rails: the count's name varies (`%{friendly_count}`), so a form may
+                // drop it only when it covers one number, and may use any base form's
+                const forms = [...plurals.forms(context.base, form).values()].map((formKey) => describe(context.base.entries.get(formKey).value));
+                if (forms.some((info) => info.error))
+                    continue;
+                const anyForm = new Set(forms.flatMap((info) => info.placeholders));
+                const other = context.base.entries.get(keyFor(form, 'other'));
+                const code = pluralLocale(target.code);
+                // Ruby I18n shows `zero` for 0 in every language. Without the
+                // language's rules there is nothing to prove a number is needed
+                const wordsAllowed = form.category === 'zero' ||
+                    (code ? singleNumber(code, form.category) : true);
+                const want = wordsAllowed
+                    ? []
+                    : describe(other?.value ?? baseEntry.value).placeholders.filter(comparable);
+                missing = want.filter((p) => !have.includes(p));
+                unexpected = have.filter((p) => !anyForm.has(p));
+            }
+            else {
+                const want = expected.placeholders.filter(comparable);
+                missing = want.filter((p) => !have.includes(p));
+                unexpected = have.filter((p) => !want.includes(p));
+            }
             if (missing.length === 0 && unexpected.length === 0)
                 continue;
             const parts = [
@@ -71671,7 +71759,7 @@ const pluralForms = (context) => context.format === 'next-intl'
 function icuPlurals({ base, targets, describe }) {
     const issues = [];
     for (const locale of [base, ...targets]) {
-        const code = intlLocale(locale.code);
+        const code = pluralLocale(locale.code);
         if (!code)
             continue;
         for (const [key, entry] of locale.entries) {
@@ -71700,7 +71788,7 @@ function suffixPlurals({ base, targets, plurals }) {
         return [];
     const issues = [];
     for (const locale of [base, ...targets]) {
-        const code = intlLocale(locale.code);
+        const code = pluralLocale(locale.code);
         for (const plural of plurals.stems(base)) {
             const forms = plurals.forms(locale, plural);
             // A group with no form at all is reported by missing-keys
@@ -71768,6 +71856,8 @@ const SCRIPTS = {
     zh: { name: 'Chinese', letters: /\p{Script=Han}/u }
 };
 const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g;
+// Date and number formats, e.g. Rails `%b %d, %Y` and `%n %u`
+const FORMAT_DIRECTIVE = /%[-_0^#:]*[A-Za-z]/g;
 const LETTER = /\p{L}/u;
 // e.g. comments.xlsx, usually the same in every language
 const FILE_NAME = /^[^\s/\\]+\.(?:csv|docx?|gif|jpe?g|json|pdf|png|pptx?|svg|txt|webp|xlsx?|xml|zip)$/i;
@@ -71812,7 +71902,7 @@ const perValue = (context) => {
             if (text === undefined || !LETTER.test(text))
                 continue;
             // Plurals count one branch: `ticket | tickets` is one word
-            const shown = describe(entry.value).longestText?.replace(URL_OR_EMAIL, ' ') ?? text;
+            const shown = withoutCode(describe(entry.value).longestText ?? text);
             let message;
             if (language !== baseLanguage &&
                 value === baseEntry.value.trim() &&
@@ -71878,7 +71968,7 @@ const sharedValues = ({ base, targets, describe, ignoreValues }) => {
                 key: '',
                 line: entry.line,
                 column: entry.column,
-                message: `${first.code} and ${second.code} have identical values, so one file was probably copied into the other`,
+                message: `${first.code} and ${second.code} have the same text in several keys, different from ${base.code}. One file may be copied from the other, or both may still have an older ${base.code} text`,
                 details: shared.map((key) => `${showKey(key)}: ${first.entries.get(key)?.value.trim()}`),
                 isNew: true
             });
@@ -71895,10 +71985,13 @@ function related(a, b) {
 // Undefined when the message is broken
 function visibleText(describe, value) {
     const info = describe(value);
-    return info.error ? undefined : info.text.replace(URL_OR_EMAIL, ' ');
+    return info.error ? undefined : withoutCode(info.text);
 }
 function ignoredSet(values) {
     return new Set(values.map((value) => value.trim().toLowerCase()));
+}
+function withoutCode(text) {
+    return text.replace(URL_OR_EMAIL, ' ').replace(FORMAT_DIRECTIVE, ' ');
 }
 
 const checks = {
@@ -71919,8 +72012,11 @@ function analyze(project, options) {
     const context = createContext(project, options.format, options.ignoreValues);
     if (context) {
         for (const [id, check] of Object.entries(checks)) {
-            if (!disabled.has(id))
-                issues.push(...check(context));
+            if (disabled.has(id))
+                continue;
+            // A spread overflows the stack past about 100k issues
+            for (const issue of check(context))
+                issues.push(issue);
         }
     }
     const ignoreKeys = options.ignoreKeys?.length
@@ -71938,7 +72034,7 @@ function sortIssues(issues) {
         (a.line ?? 0) - (b.line ?? 0) ||
         compareKeys(a.key, b.key));
 }
-const PLURAL_FORM = new RegExp(`^(.+_(?:ordinal_)?)(${PLURAL_CATEGORIES.join('|')})$`);
+const PLURAL_FORM = new RegExp(`^(.+[_.](?:ordinal_)?)(${PLURAL_CATEGORIES.join('|')})$`);
 // Alphabetical, but plural forms of one key keep CLDR order (zero … other)
 function compareKeys(a, b) {
     const pluralA = PLURAL_FORM.exec(a);
@@ -79263,6 +79359,20 @@ function unwrapMessage(message) {
     return typeof message === "string" ? message : message?.message;
 }
 /* A check holds no link back to the schema it is attached to — the same check instance is shared by every clone of that schema — so the owner is stamped onto the issues a check just raised, at the only point where both are in scope. Runs on the failure path only; `start` is the issue count from before the check ran. */
+/** The leading size checks of `defChecks` that set an upper bound, each paired with it. */
+function sizeCaps(defChecks) {
+    const caps = [];
+    for (const ch of defChecks ?? []) {
+        const d = ch._zod.def;
+        // a later check may rewrite the value
+        if (!/_(length|size)$|_equals$/.test(d.check))
+            break;
+        const max = d.maximum ?? d.length ?? d.size;
+        if (max >= 0)
+            caps.push([max, ch]);
+    }
+    return caps;
+}
 function attachSchema(issues, start, inst) {
     var _a;
     for (let i = start; i < issues.length; i++) {
@@ -80270,7 +80380,7 @@ class Doc {
 const version = {
     major: 4,
     minor: 6,
-    patch: 5,
+    patch: 7,
 };
 
 const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
@@ -80844,6 +80954,31 @@ const $ZodNever = /*@__PURE__*/ $constructor("$ZodNever", (inst, def) => {
         return payload;
     };
 });
+// an oversized container fails its leading size checks before any element is parsed
+function capSize(inst, size) {
+    const caps = sizeCaps(inst._zod.def.checks);
+    if (!caps.length)
+        return;
+    const cap = Math.min(...caps.map((c) => c[0]));
+    const parse = inst._zod.parse;
+    inst._zod.parse = (payload, ctx) => {
+        const n = size(payload.value);
+        if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
+            for (const [max, ch] of sizeCaps(inst._zod.def.checks)) {
+                if (n > max && ch._zod.def.when(payload)) {
+                    const start = payload.issues.length;
+                    ch._zod.check(payload);
+                    // the value is still the raw input, so no later check may read it
+                    payload.issues[start].continue = false;
+                    attachSchema(payload.issues, start, inst);
+                    return payload;
+                }
+            }
+        }
+        return parse(payload, ctx);
+    };
+}
+const arraySize = (input) => (Array.isArray(input) ? input.length : -1);
 function handleArrayResult(result, final, index) {
     if (result.issues.length) {
         final.issues.push(...prefixIssues(index, result.issues));
@@ -80889,6 +81024,7 @@ const $ZodArray = /*@__PURE__*/ $constructor("$ZodArray", (inst, def) => {
         }
         return payload; //handleArrayResultsAsync(parseResults, final);
     };
+    capSize(inst, arraySize);
 });
 function handlePropertyResult(result, final, key, input, optin, optout) {
     const isPresent = key in input;
@@ -84796,6 +84932,13 @@ const configSchema = strictObject({
                 ctx.addIssue({ code: 'custom', message: problem });
         }
     }),
+    // A base file named without its locale: lang/main.json next to lang/main-ar.json
+    'base-file': string()
+        .trim()
+        .refine((path) => !path.includes('{locale}'), 'must be one file, without {locale}')
+        .refine((path) => /\.(json|ya?ml)$/i.test(path), 'must be a .json, .yml or .yaml file')
+        .transform((path) => path.replace(/\\/g, '/').replace(/^\.\//, ''))
+        .optional(),
     'fail-on': _enum(['error', 'warning', 'never']).default('error'),
     'fail-on-existing': flag.default(false),
     'check-when': _enum(['locale-changes', 'always']).default('locale-changes'),
@@ -86652,6 +86795,42 @@ function scalarToString(value) {
         return '';
     return String(value);
 }
+// Rails wraps a file in its locale: `en:` in en.yml. Unwrapped only when that
+// is the file's single top key, it holds keys, and it is the file's locale or
+// the base locale, since some projects wrap every file in `en`
+function unwrapLocaleRoot(parsed, locales) {
+    const normal = (code) => code.toLowerCase().replace(/_/g, '-');
+    const codes = locales.map(normal);
+    const root = parsed.nodes.find((node) => codes.includes(normal(node.key)))?.key;
+    if (!root)
+        return parsed;
+    // `bs:` and nothing else: a locale with no keys yet
+    const [only] = parsed.entries;
+    if (parsed.nodes.length === 1 &&
+        parsed.entries.length === 1 &&
+        only?.path.length === 1 &&
+        only.value === '') {
+        return { ok: true, root, entries: [], nodes: [] };
+    }
+    const inside = (key) => key.startsWith(`${root}.`);
+    const wrapped = parsed.nodes.every((node) => node.key === root || inside(node.key)) &&
+        parsed.entries.every((entry) => entry.path[0] === root && entry.path.length > 1);
+    if (!wrapped)
+        return parsed;
+    const strip = (key) => key.slice(root.length + 1);
+    return {
+        ok: true,
+        root,
+        entries: parsed.entries.map((entry) => ({
+            ...entry,
+            key: strip(entry.key),
+            path: entry.path.slice(1)
+        })),
+        nodes: parsed.nodes
+            .filter((node) => node.key !== root)
+            .map((node) => ({ ...node, key: strip(node.key) }))
+    };
+}
 
 // Comments and trailing commas are errors: apps load these files as strict JSON
 function parseJson(text) {
@@ -86842,8 +87021,8 @@ async function loadProject(source, options) {
             const match = matchPattern(pattern, path);
             if (!match || ignored.has(match.locale))
                 continue;
-            // e.g. locales/vee-validate-ur.json next to the real locale files
-            if (!intlLocale(match.locale)) {
+            // e.g. locales/vee-validate-ur.json or themes.json next to the locale files
+            if (!isLocaleCode(match.locale)) {
                 skipped.push(path);
                 continue;
             }
@@ -86852,6 +87031,15 @@ async function loadProject(source, options) {
                 files.push({ path, namespace: match.namespace });
             }
             found.set(match.locale, files);
+        }
+    }
+    if (options.baseFile) {
+        const path = options.baseFile.replace(/\\/g, '/').replace(/^\.\//, '');
+        const [exists] = await source.glob([path]);
+        const files = found.get(options.baseLocale) ?? [];
+        if (exists && !files.some((file) => file.path === exists)) {
+            files.push({ path: exists, namespace: '' });
+            found.set(options.baseLocale, files);
         }
     }
     const parseErrors = [];
@@ -86868,8 +87056,8 @@ async function loadProject(source, options) {
             file,
             result: parse(file.path, await source.read(file.path))
         })));
-        for (const { file, result } of results) {
-            if (!result.ok) {
+        for (const { file, result: parsed } of results) {
+            if (!parsed.ok) {
                 locale.brokenNamespaces.add(file.namespace);
                 parseErrors.push({
                     check: 'parse-error',
@@ -86877,12 +87065,19 @@ async function loadProject(source, options) {
                     locale: code,
                     file: file.path,
                     key: '',
-                    line: result.line,
-                    column: result.column,
-                    message: result.message,
+                    line: parsed.line,
+                    column: parsed.column,
+                    message: parsed.message,
                     isNew: true
                 });
                 continue;
+            }
+            const result = unwrapLocaleRoot(parsed, [code, options.baseLocale]);
+            // Rails merges every file of a locale into one tree, so a file name
+            // like devise.en.yml is not a namespace
+            if (result.root) {
+                file.root = result.root;
+                file.namespace = '';
             }
             const prefix = file.namespace;
             if (prefix) {
@@ -86911,11 +87106,20 @@ async function loadProject(source, options) {
         }
         locales.set(code, locale);
     }));
+    // Rails files share one tree, so a broken file can hold any key of its locale
+    const rails = [...locales.values()].some((locale) => locale.files.some((file) => file.root));
+    if (rails) {
+        for (const locale of locales.values()) {
+            if (locale.brokenNamespaces.size)
+                locale.brokenNamespaces.add('');
+        }
+    }
     return {
         baseLocale: options.baseLocale,
         locales: new Map([...locales].sort(([a], [b]) => a.localeCompare(b))),
         parseErrors,
-        skipped
+        // devise.en.yml fails `{locale}.yml` but loads through `*.{locale}.yml`
+        skipped: skipped.filter((path) => ![...found.values()].some((files) => files.some((file) => file.path === path)))
     };
 }
 function parse(path, raw) {
@@ -86983,7 +87187,7 @@ const LABELS = {
     'plural-forms': ['missing plural form', 'missing plural forms']
 };
 const CHECK_ORDER = Object.keys(LABELS);
-const PLURAL_SUFFIX = new RegExp(`_(ordinal_)?(?:${PLURAL_CATEGORIES.filter((c) => c !== 'other').join('|')})$`);
+const PLURAL_SUFFIX = new RegExp(`([_.])(ordinal_)?(?:${PLURAL_CATEGORIES.filter((c) => c !== 'other').join('|')})$`);
 const RESERVED = 400;
 function renderReport(input) {
     const fresh = input.issues.filter((issue) => issue.isNew);
@@ -87088,7 +87292,8 @@ function mergeMissingKeys(groups) {
         const same = bySignature.get(signature);
         if (same) {
             same.locales.push(group.locale);
-            same.issues.push(...group.issues);
+            for (const issue of group.issues)
+                same.issues.push(issue);
         }
         else {
             const copy = {
@@ -87144,20 +87349,16 @@ function renderSharedMissingKeys(group, input, heading) {
         out += `| ${url ? `[${key}](${url})` : key} | ${cell(issue.baseValue ?? '')} |\n`;
     }
     for (const [file, fileIssues] of byFile(first)) {
-        out += copyPasteBlock(`Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale)`, file, fileIssues, project);
+        const under = rootKey(project, group.locale, file)
+            ? ', under each locale key'
+            : '';
+        out += copyPasteBlock(`Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale${under})`, file, fileIssues, project, false);
     }
     return out;
 }
-// `locales/ar/common.json` -> `locales/{locale}/common.json`
+// `locales/ar/common.json` -> `locales/{locale}/common.json`, `main-ar.json` -> `main-{locale}.json`
 function withLocalePlaceholder(path, locale) {
-    return path
-        .split('/')
-        .map((segment) => segment === locale
-        ? '{locale}'
-        : segment.startsWith(`${locale}.`)
-            ? `{locale}${segment.slice(locale.length)}`
-            : segment)
-        .join('/');
+    return replaceLocale(path, locale, '{locale}');
 }
 function location(issue, input) {
     const name = issue.file.split('/').pop() ?? issue.file;
@@ -87195,7 +87396,7 @@ function hasParent(locale, key) {
 // Falls back to the `other` form for a plural form the base lacks
 function baseEntryOf(base, key) {
     return (base?.entries.get(key) ??
-        base?.entries.get(key.replace(PLURAL_SUFFIX, '_$1other')));
+        base?.entries.get(key.replace(PLURAL_SUFFIX, '$1$2other')));
 }
 function copyPaste(issues, project) {
     let out = '';
@@ -87204,15 +87405,29 @@ function copyPaste(issues, project) {
     }
     return out;
 }
-function copyPasteBlock(summary, file, issues, project) {
+function copyPasteBlock(summary, file, issues, project, wrap = true) {
     const base = project.locales.get(project.baseLocale);
+    const root = wrap
+        ? rootKey(project, issues[0]?.locale ?? '', file)
+        : undefined;
     const tree = {};
     for (const issue of issues) {
-        setPath(tree, pathInFile(base, issue.key), '');
+        const path = pathInFile(base, issue.key);
+        setPath(tree, root ? [root, ...path] : path, '');
     }
     const yaml = /\.ya?ml$/i.test(file);
     const code = yaml ? stringify(tree).trimEnd() : JSON.stringify(tree, null, 2);
     return `\n<details><summary>📋 ${summary}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`;
+}
+// The file's locale key, or the locale for a file not created yet when the base has one
+function rootKey(project, locale, file) {
+    const own = project.locales
+        .get(locale)
+        ?.files.find((localeFile) => localeFile.path === file);
+    if (own)
+        return own.root;
+    const base = project.locales.get(project.baseLocale);
+    return base?.files.some((baseFile) => baseFile.root) ? locale : undefined;
 }
 // The key without its file's namespace
 function keyInFile(base, key) {
@@ -87455,6 +87670,7 @@ const COMMENT_LIMIT = 65_000;
 const INPUTS = [
     'format',
     'base-locale',
+    'base-file',
     'files',
     'fail-on',
     'fail-on-existing',
@@ -87508,6 +87724,10 @@ async function check(config, workspace, configPath) {
     }
     if (!project.locales.has(baseLocale)) {
         const found = [...project.locales.keys()];
+        if (config['base-file']) {
+            setFailed(`Base file "${config['base-file']}" was not found. Check "base-file".`);
+            return;
+        }
         setFailed(found.length
             ? `Base locale "${baseLocale}" was not found. Found: ${found.join(', ')}. Check "base-locale" and "files".`
             : `No locale files match ${config.files.map((p) => `"${p}"`).join(', ')}. Check "files".`);
@@ -87556,7 +87776,9 @@ async function analyzeBase(octokit, context, config) {
     if (!pr)
         return undefined;
     try {
-        const source = await baseFileSource(octokit, context.repo, pr.baseSha, config.files);
+        const source = await baseFileSource(octokit, context.repo, pr.baseSha, config['base-file']
+            ? [...config.files, config['base-file']]
+            : config.files);
         const project = await loadProject(source, loadOptions(config));
         return analyze(project, analyzeOptions(config));
     }
@@ -87569,6 +87791,7 @@ function loadOptions(config) {
     return {
         patterns: config.files,
         baseLocale: config['base-locale'],
+        baseFile: config['base-file'],
         ignoreLocales: config['ignore-locales']
     };
 }
@@ -87598,7 +87821,11 @@ async function skipPullRequest(octokit, context, config, configPath) {
         return false;
     try {
         const changed = await listChangedFiles(octokit, context.repo, pr.number);
-        if (touchesLocales(changed, config.files, [configPath]))
+        const extra = [
+            configPath,
+            ...(config['base-file'] ? [config['base-file']] : [])
+        ];
+        if (touchesLocales(changed, config.files, extra))
             return false;
         // A previous comment may show stale issues, so run again
         return !(config.comment && (await findComment(octokit, context.repo, pr.number)));

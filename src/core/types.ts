@@ -38,6 +38,8 @@ export interface LocaleFile {
   path: string
   // Prefix of every key in a namespace file, '' otherwise
   namespace: string
+  // The locale key the file is wrapped in, as in Rails: `en:`
+  root?: string
 }
 
 export interface Locale {

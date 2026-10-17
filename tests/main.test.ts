@@ -384,6 +384,54 @@ describe('run', () => {
     })
   })
 
+  it('compares with a base file named without its locale, on both branches', async () => {
+    process.env.GITHUB_WORKSPACE = 'tests/fixtures/base-file-project'
+    const read = (name: string) =>
+      readFileSync(`tests/fixtures/base-file-project/lang/${name}`, 'utf8')
+    const { state } = setup({
+      inputs: {
+        files: 'lang/main-{locale}.json',
+        'base-file': 'lang/main.json',
+        format: 'json'
+      },
+      state: {
+        // Only the base file changed: the run must not be skipped
+        files: [{ filename: 'lang/main.json' }],
+        baseFiles: {
+          'lang/main.json': '{\n  "title": "Campaigns"\n}\n',
+          'lang/main-ar.json': read('main-ar.json')
+        }
+      }
+    })
+
+    await run()
+
+    const body = state.comments[0]?.body ?? ''
+    expect(body).toContain('### ❌ ar: 1 missing key')
+    expect(body).toContain('`notFound`')
+    expect(body).toContain('Copy-paste for lang/main-ar.json')
+    // The base branch was read through its base file too
+    expect(body).toContain('New in this PR: 1 · Already existing: 0')
+  })
+
+  it('names the base file setting when that file does not exist', async () => {
+    process.env.GITHUB_WORKSPACE = 'tests/fixtures/base-file-project'
+    setup({
+      inputs: {
+        files: 'lang/main-{locale}.json',
+        'base-file': 'lang/mian.json',
+        format: 'json'
+      },
+      state: { files: [{ filename: 'lang/main-ar.json' }] }
+    })
+
+    await run()
+
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'Base file "lang/mian.json" was not found. Check "base-file".'
+    )
+  })
+
   it('explains when no file matches the pattern', async () => {
     setup({
       inputs: { files: 'nothing/{locale}.json' },

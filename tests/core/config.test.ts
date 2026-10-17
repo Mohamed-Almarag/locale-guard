@@ -139,6 +139,29 @@ describe('parseConfig', () => {
     })
   })
 
+  it('reads a base file named without its locale', () => {
+    const result = parseConfig({
+      files: 'lang/main-{locale}.json',
+      'base-file': './lang\\main.json'
+    })
+    expect(result.ok && result.config['base-file']).toBe('lang/main.json')
+  })
+
+  it('rejects a base file with {locale} or another extension', () => {
+    expect(
+      parseConfig({ files: 'l/{locale}.json', 'base-file': 'l/{locale}.json' })
+    ).toMatchObject({
+      ok: false,
+      errors: [expect.stringContaining('must be one file, without {locale}')]
+    })
+    expect(
+      parseConfig({ files: 'l/{locale}.json', 'base-file': 'l/main.txt' })
+    ).toMatchObject({
+      ok: false,
+      errors: [expect.stringContaining('must be a .json, .yml or .yaml file')]
+    })
+  })
+
   it('rejects a flag that is not true or false', () => {
     const result = parseConfig({
       files: 'l/{locale}.json',

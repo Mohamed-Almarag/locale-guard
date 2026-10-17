@@ -237,3 +237,36 @@ describe('empty-values', () => {
     expect(issues[0]?.baseValue).toBe('A')
   })
 })
+
+describe('broken Rails files', () => {
+  const files = (broken: 'ar' | 'en') => ({
+    'config/locales/en.yml': 'en:\n  title: Home\n',
+    'config/locales/devise.en.yml':
+      broken === 'en'
+        ? 'en:\n  devise: [\n'
+        : 'en:\n  devise:\n    failure: Failed\n  errors:\n    blank: Blank\n',
+    'config/locales/ar.yml': 'ar:\n  title: الرئيسية\n',
+    'config/locales/devise.ar.yml':
+      broken === 'ar'
+        ? 'ar:\n  devise: [\n'
+        : 'ar:\n  devise:\n    failure: فشل\n  errors:\n    blank: فارغ\n'
+  })
+  const patterns = [
+    'config/locales/{locale}.yml',
+    'config/locales/*.{locale}.yml'
+  ]
+
+  // A broken file can hold any key of its locale, so only the parse error shows
+  it.each(['ar', 'en'] as const)(
+    'reports only the parse error when a %s file is broken',
+    async (broken) => {
+      for (const check of ['missing-keys', 'extra-keys'] as const) {
+        expect(await run(check, files(broken), { patterns })).toEqual([])
+      }
+      const errors = await run('parse-error', files(broken), { patterns })
+      expect(errors.map((issue) => issue.file)).toEqual([
+        `config/locales/devise.${broken}.yml`
+      ])
+    }
+  )
+})

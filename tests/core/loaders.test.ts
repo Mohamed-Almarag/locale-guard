@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseJson } from '../../src/core/loaders/json.js'
 import { parseYaml } from '../../src/core/loaders/yaml.js'
+import { loadProject, memoryFileSource } from '../../src/core/loaders/index.js'
 import { json, load } from '../helpers.js'
 
 describe('parseJson', () => {
@@ -197,14 +198,145 @@ describe('loadProject', () => {
     const project = await load({
       'locales/en.json': json({ a: 'A' }),
       'locales/ur.json': json({ a: 'ا' }),
-      'locales/vee-validate-ur.json': json({ messages: { required: 'x' } })
+      'locales/vee-validate-ur.json': json({ messages: { required: 'x' } }),
+      // Intl alone takes `themes` as a language
+      'locales/themes.json': json({ dark: 'Dark' })
     })
     expect([...project.locales.keys()]).toEqual(['en', 'ur'])
-    expect(project.skipped).toEqual(['locales/vee-validate-ur.json'])
+    expect(project.skipped).toEqual([
+      'locales/themes.json',
+      'locales/vee-validate-ur.json'
+    ])
   })
 
   it('ignores a byte order mark', async () => {
     const project = await load({ 'locales/en.json': '﻿{"a": "A"}' })
     expect(project.parseErrors).toEqual([])
+  })
+
+  it('unwraps a file wrapped in its locale key, as Rails writes it', async () => {
+    const project = await load(
+      {
+        'config/locales/en.yml': 'en:\n  cart:\n    title: Cart\n',
+        'config/locales/pt_BR.yml': 'pt-BR:\n  cart:\n    title: Carrinho\n'
+      },
+      { patterns: ['config/locales/{locale}.yml'] }
+    )
+    const en = project.locales.get('en')
+    expect([...(en?.entries.keys() ?? [])]).toEqual(['cart.title'])
+    expect(en?.entries.get('cart.title')).toMatchObject({
+      filePath: ['cart', 'title'],
+      line: 3
+    })
+    expect([...(en?.nodes.keys() ?? [])]).toEqual(['cart', 'cart.title'])
+    expect(en?.files[0]?.root).toBe('en')
+    const pt = project.locales.get('pt_BR')
+    expect(pt?.files[0]?.root).toBe('pt-BR')
+    expect([...(pt?.entries.keys() ?? [])]).toEqual(['cart.title'])
+  })
+
+  it('reads a base file named without its locale as the base locale', async () => {
+    const project = await loadProject(
+      memoryFileSource({
+        'lang/main.json': json({ a: 'A' }),
+        'lang/main-ar.json': json({ a: 'ا' }),
+        'lang/main-fr.json': json({ a: 'A-fr' })
+      }),
+      {
+        patterns: ['lang/main-{locale}.json'],
+        baseLocale: 'en',
+        baseFile: 'lang/main.json'
+      }
+    )
+    expect([...project.locales.keys()]).toEqual(['ar', 'en', 'fr'])
+    expect(project.locales.get('en')?.files).toEqual([
+      { path: 'lang/main.json', namespace: '' }
+    ])
+  })
+
+  it('loads nothing extra when the base file does not exist', async () => {
+    const project = await loadProject(
+      memoryFileSource({ 'lang/main-ar.json': json({ a: 'ا' }) }),
+      {
+        patterns: ['lang/main-{locale}.json'],
+        baseLocale: 'en',
+        baseFile: 'lang/main.json'
+      }
+    )
+    expect([...project.locales.keys()]).toEqual(['ar'])
+  })
+
+  it('unwraps JSON the same way', async () => {
+    const project = await load({ 'locales/en.json': json({ en: { a: 'A' } }) })
+    expect([...(project.locales.get('en')?.entries.keys() ?? [])]).toEqual([
+      'a'
+    ])
+  })
+
+  it('reads a file with only its locale key as a locale with no keys', async () => {
+    const project = await load(
+      {
+        'config/locales/en.yml': 'en:\n  a: A\n',
+        'config/locales/bs.yml': 'bs:\n'
+      },
+      { patterns: ['config/locales/{locale}.yml'] }
+    )
+    expect(project.locales.get('bs')?.entries.size).toBe(0)
+    expect(project.locales.get('bs')?.files[0]?.root).toBe('bs')
+  })
+
+  it('unwraps files that all use the base locale key', async () => {
+    const project = await load({
+      'locales/en.json': json({ en: { a: 'A' } }),
+      'locales/da_DK.json': json({ en: { a: 'A-da' } })
+    })
+    expect([...(project.locales.get('da_DK')?.entries.keys() ?? [])]).toEqual([
+      'a'
+    ])
+  })
+
+  it('merges every Rails file of a locale into one tree', async () => {
+    const project = await load(
+      {
+        'config/locales/en.yml': 'en:\n  title: Home\n',
+        'config/locales/devise.en.yml':
+          'en:\n  devise:\n    failure: Failed\n  errors:\n    blank: Blank\n'
+      },
+      {
+        patterns: [
+          'config/locales/{locale}.yml',
+          'config/locales/*.{locale}.yml'
+        ]
+      }
+    )
+    const en = project.locales.get('en')
+    expect([...(en?.entries.keys() ?? [])].sort()).toEqual([
+      'devise.failure',
+      'errors.blank',
+      'title'
+    ])
+    expect(en?.entries.get('errors.blank')?.file).toBe(
+      'config/locales/devise.en.yml'
+    )
+    // The first pattern rejects devise.en.yml, but the second loads it
+    expect(project.skipped).toEqual([])
+  })
+
+  it('keeps a top key that is not only the locale wrapper', async () => {
+    const keys = async (text: string) => {
+      const project = await load(
+        { 'locales/en.yml': text },
+        { patterns: ['locales/{locale}.yml'] }
+      )
+      return [...(project.locales.get('en')?.entries.keys() ?? [])]
+    }
+    // A second top key
+    expect(await keys('en:\n  a: A\nb: B\n')).toEqual(['en.a', 'b'])
+    // A value, not keys
+    expect(await keys('en: English\n')).toEqual(['en'])
+    // Another locale's key
+    expect(await keys('fr:\n  a: A\n')).toEqual(['fr.a'])
+    // A flat key that starts with the locale
+    expect(await keys('"en.a": A\n')).toEqual(['en.a'])
   })
 })

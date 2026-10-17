@@ -1,7 +1,9 @@
 import { type MessageInfo, finalize } from './message.js'
 
-// `{{name}}` (i18next, spaces allowed) and `{name}` (most other libraries)
-const PLACEHOLDER = /\{\{\s*([\w.-]+)\s*\}\}|\{([\w.-]+)\}/g
+// `{{name}}` (i18next, spaces allowed) and `{name}` (most other libraries).
+// Any script, so a translated name like `{الاسم}` shows as unexpected
+const PLACEHOLDER =
+  /\{\{\s*([\p{L}\p{M}\p{N}_.-]+)\s*\}\}|\{([\p{L}\p{M}\p{N}_.-]+)\}/gu
 
 // Plain JSON has no grammar, so placeholders are found with a pattern
 export function describePlainMessage(source: string): MessageInfo {

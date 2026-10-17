@@ -2,10 +2,10 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import picomatch from 'picomatch'
 import { glob } from 'tinyglobby'
-import { intlLocale } from '../locale-code.js'
+import { isLocaleCode } from '../locale-code.js'
 import type { Issue, Locale, LocaleFile, Project } from '../types.js'
 import { parseJson } from './json.js'
-import type { ParseResult } from './parsed.js'
+import { type ParseResult, unwrapLocaleRoot } from './parsed.js'
 import { matchPattern, toGlob } from './pattern.js'
 import { parseYaml } from './yaml.js'
 
@@ -56,6 +56,8 @@ export function memoryFileSource(files: Record<string, string>): FileSource {
 export interface LoadOptions {
   patterns: string[]
   baseLocale: string
+  // Read as the base locale; its name has no locale code
+  baseFile?: string
   ignoreLocales?: string[]
 }
 
@@ -72,8 +74,8 @@ export async function loadProject(
     for (const path of paths.sort()) {
       const match = matchPattern(pattern, path)
       if (!match || ignored.has(match.locale)) continue
-      // e.g. locales/vee-validate-ur.json next to the real locale files
-      if (!intlLocale(match.locale)) {
+      // e.g. locales/vee-validate-ur.json or themes.json next to the locale files
+      if (!isLocaleCode(match.locale)) {
         skipped.push(path)
         continue
       }
@@ -82,6 +84,16 @@ export async function loadProject(
         files.push({ path, namespace: match.namespace })
       }
       found.set(match.locale, files)
+    }
+  }
+
+  if (options.baseFile) {
+    const path = options.baseFile.replace(/\\/g, '/').replace(/^\.\//, '')
+    const [exists] = await source.glob([path])
+    const files = found.get(options.baseLocale) ?? []
+    if (exists && !files.some((file) => file.path === exists)) {
+      files.push({ path: exists, namespace: '' })
+      found.set(options.baseLocale, files)
     }
   }
 
@@ -105,8 +117,8 @@ export async function loadProject(
         }))
       )
 
-      for (const { file, result } of results) {
-        if (!result.ok) {
+      for (const { file, result: parsed } of results) {
+        if (!parsed.ok) {
           locale.brokenNamespaces.add(file.namespace)
           parseErrors.push({
             check: 'parse-error',
@@ -114,14 +126,21 @@ export async function loadProject(
             locale: code,
             file: file.path,
             key: '',
-            line: result.line,
-            column: result.column,
-            message: result.message,
+            line: parsed.line,
+            column: parsed.column,
+            message: parsed.message,
             isNew: true
           })
           continue
         }
 
+        const result = unwrapLocaleRoot(parsed, [code, options.baseLocale])
+        // Rails merges every file of a locale into one tree, so a file name
+        // like devise.en.yml is not a namespace
+        if (result.root) {
+          file.root = result.root
+          file.namespace = ''
+        }
         const prefix = file.namespace
         if (prefix) {
           locale.nodes.set(prefix, { file: file.path, line: 1, column: 1 })
@@ -152,11 +171,27 @@ export async function loadProject(
     })
   )
 
+  // Rails files share one tree, so a broken file can hold any key of its locale
+  const rails = [...locales.values()].some((locale) =>
+    locale.files.some((file) => file.root)
+  )
+  if (rails) {
+    for (const locale of locales.values()) {
+      if (locale.brokenNamespaces.size) locale.brokenNamespaces.add('')
+    }
+  }
+
   return {
     baseLocale: options.baseLocale,
     locales: new Map([...locales].sort(([a], [b]) => a.localeCompare(b))),
     parseErrors,
-    skipped
+    // devise.en.yml fails `{locale}.yml` but loads through `*.{locale}.yml`
+    skipped: skipped.filter(
+      (path) =>
+        ![...found.values()].some((files) =>
+          files.some((file) => file.path === path)
+        )
+    )
   }
 }
 
