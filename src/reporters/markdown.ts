@@ -222,11 +222,15 @@ function renderSharedMissingKeys(
   }
 
   for (const [file, fileIssues] of byFile(first)) {
+    const under = rootKey(project, group.locale, file)
+      ? ', under each locale key'
+      : ''
     out += copyPasteBlock(
-      `Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale)`,
+      `Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale${under})`,
       file,
       fileIssues,
-      project
+      project,
+      false
     )
   }
   return out
@@ -301,16 +305,35 @@ function copyPasteBlock(
   summary: string,
   file: string,
   issues: Issue[],
-  project: Project
+  project: Project,
+  wrap = true
 ): string {
   const base = project.locales.get(project.baseLocale)
+  const root = wrap
+    ? rootKey(project, issues[0]?.locale ?? '', file)
+    : undefined
   const tree: Record<string, unknown> = {}
   for (const issue of issues) {
-    setPath(tree, pathInFile(base, issue.key), '')
+    const path = pathInFile(base, issue.key)
+    setPath(tree, root ? [root, ...path] : path, '')
   }
   const yaml = /\.ya?ml$/i.test(file)
   const code = yaml ? toYaml(tree).trimEnd() : JSON.stringify(tree, null, 2)
   return `\n<details><summary>📋 ${summary}</summary>\n\n\`\`\`${yaml ? 'yaml' : 'json'}\n${code}\n\`\`\`\n</details>\n`
+}
+
+// The file's locale key, or the locale for a file not created yet when the base has one
+function rootKey(
+  project: Project,
+  locale: string,
+  file: string
+): string | undefined {
+  const own = project.locales
+    .get(locale)
+    ?.files.find((localeFile) => localeFile.path === file)
+  if (own) return own.root
+  const base = project.locales.get(project.baseLocale)
+  return base?.files.some((baseFile) => baseFile.root) ? locale : undefined
 }
 
 // The key without its file's namespace

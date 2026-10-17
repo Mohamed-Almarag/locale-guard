@@ -7,6 +7,7 @@ import type {
   Position,
   Project
 } from '../types.js'
+import { replaceLocale } from '../locale-code.js'
 import { SuffixPlurals, baseKeyFor } from './suffix-plurals.js'
 
 export interface CheckContext {
@@ -81,12 +82,20 @@ export function expectedFile(
   base: Locale,
   key: string
 ): string {
+  // The base key's own file, e.g. Rails devise.en.yml -> devise.ar.yml
+  const own = base.entries.get(key)?.file
+  const mirror = own && replaceLocale(own, base.code, target.code)
+  if (mirror && target.files.some((file) => file.path === mirror)) return mirror
+  // A Rails file the locale does not have yet: devise.ar.yml, to create
+  const rails = base.files.some((file) => file.path === own && file.root)
+  if (mirror && rails && mirror !== own) return mirror
+
   const namespace = namespaceOf(base, key)
   const existing = target.files.find((file) => file.namespace === namespace)
   if (existing) return existing.path
   const baseFile = base.files.find((file) => file.namespace === namespace)
   return baseFile
-    ? swapLocale(baseFile.path, base.code, target.code)
+    ? replaceLocale(baseFile.path, base.code, target.code)
     : (target.files[0]?.path ?? '')
 }
 
@@ -98,17 +107,4 @@ export function anchorFor(locale: Locale, key: string): Position {
     if (node) return { line: node.line, column: node.column }
   }
   return { line: 1, column: 1 }
-}
-
-function swapLocale(path: string, from: string, to: string): string {
-  return path
-    .split('/')
-    .map((segment) =>
-      segment === from
-        ? to
-        : segment.startsWith(`${from}.`)
-          ? to + segment.slice(from.length)
-          : segment
-    )
-    .join('/')
 }

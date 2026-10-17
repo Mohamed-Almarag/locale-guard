@@ -90,6 +90,65 @@ describe('renderReport', () => {
     expect(body).toContain('```yaml\ncoupon:\n  invalid: ""\n```')
   })
 
+  it('wraps the copy-paste block in the locale key, as Rails files are', async () => {
+    const files = {
+      'config/locales/en.yml':
+        'en:\n  cart:\n    title: Cart\n    empty: Empty\n',
+      'config/locales/ar.yml': 'ar:\n  cart:\n    title: السلة\n'
+    }
+    const patterns = ['config/locales/{locale}.yml']
+    const body = await report(files, { patterns })
+    expect(body).toContain('### ❌ ar: 1 missing key')
+    expect(body).toContain('```yaml\nar:\n  cart:\n    empty: ""\n```')
+
+    const shared = await report(
+      {
+        ...files,
+        'config/locales/fr.yml': 'fr:\n  cart:\n    title: Panier\n'
+      },
+      { patterns }
+    )
+    expect(shared).toContain(
+      'Copy-paste for config/locales/{locale}.yml (the same in each locale, under each locale key)'
+    )
+    expect(shared).toContain('```yaml\ncart:\n  empty: ""\n```')
+  })
+
+  it('puts a missing Rails key in the file that mirrors the base file', async () => {
+    const body = await report(
+      {
+        'config/locales/en.yml': 'en:\n  title: Home\n',
+        'config/locales/devise.en.yml': 'en:\n  devise:\n    failure: Failed\n',
+        'config/locales/ar.yml': 'ar:\n  title: الرئيسية\n',
+        'config/locales/devise.ar.yml': 'ar:\n  devise: {}\n'
+      },
+      {
+        patterns: [
+          'config/locales/{locale}.yml',
+          'config/locales/*.{locale}.yml'
+        ]
+      }
+    )
+    expect(body).toContain('[`devise.failure`]')
+    expect(body).toContain(
+      'Copy-paste for config/locales/devise.ar.yml</summary>\n\n```yaml\nar:\n  devise:\n    failure: ""\n```'
+    )
+  })
+
+  it('wraps a file not created yet like the base file', async () => {
+    const body = await report(
+      {
+        'config/locales/en/shop.yml': 'en:\n  a: A\n',
+        'config/locales/en/user.yml': 'en:\n  b: B\n',
+        'config/locales/ar/user.yml': 'ar:\n  b: ب\n'
+      },
+      { patterns: ['config/locales/{locale}/*.yml'] }
+    )
+    expect(body).toContain(
+      'Copy-paste for config/locales/ar/shop.yml</summary>\n\n```yaml\nar:\n  a: ""\n```'
+    )
+  })
+
   it('keeps flat keys flat in the copy-paste block, as react-intl expects', async () => {
     const body = await report({
       'locales/en.json': json({
