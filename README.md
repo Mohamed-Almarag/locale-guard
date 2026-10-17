@@ -84,7 +84,10 @@ projects need.
 
 Plural forms come from `Intl.PluralRules`, so every language works without
 tables: English needs `one` and `other`, Arabic needs `zero`, `one`, `two`,
-`few`, `many` and `other`, and Japanese needs only `other`.
+`few`, `many` and `other`, and Japanese needs only `other`. In Rails YAML files,
+a key whose children are only plural forms (`count.one`, `count.other`) is
+checked the same way, which matches the rules of
+[rails-i18n](https://github.com/svenfuchs/rails-i18n).
 
 ## Formats
 
@@ -97,6 +100,7 @@ Set `format` to the name of your translation library:
 | next-intl, use-intl                               | `next-intl`     | ICU: `{count, plural, ...}`, `{x, select, ...}`, `<b>tags</b>` |
 | react-intl, FormatJS                              | `react-intl`    | ICU                                                            |
 | i18next, react-i18next, next-i18next, i18next-vue | `react-i18next` | `{{name}}`, plurals as `key_one`, `key_other`                  |
+| Rails I18n                                        | `json`          | `%{name}`, plurals as `key.one`, `key.other`                   |
 | Anything else                                     | `json`          | `{name}` and `{{name}}`                                        |
 
 The names that share a syntax do the same thing, so `icu`, `next-intl` and
@@ -119,24 +123,55 @@ Keys can be nested (`{ "cart": { "title": "Cart" } }`) or flat
 (`{ "cart.title": "Cart" }`). The copy-paste block follows whichever way the
 base file writes each key.
 
+### Rails
+
+Rails wraps each file in its locale key (`en:` at the top of `en.yml`) and
+merges every file of a language into one tree. Give both patterns:
+
+```yaml
+files: |
+  config/locales/{locale}.yml
+  config/locales/*.{locale}.yml
+format: json
+```
+
+Locale Guard reads the locale key as the wrapper, so
+`en: { cart: { title: … } }` is the key `cart.title`. A key missing from
+`devise.ar.yml` is placed in that file, and the copy-paste block puts the locale
+key back on top.
+
+### A base file without a locale code
+
+Some projects name the base file without its locale, such as `lang/main.json`
+next to `lang/main-ar.json` and `lang/main-fr.json`. No `{locale}` pattern
+matches it, so name it with `base-file`:
+
+```yaml
+files: lang/main-{locale}.json
+base-file: lang/main.json
+```
+
+A pull request that changes only the base file is checked too.
+
 ## Inputs
 
-| Input              | Default               | Description                                                                                                                                                                           |
-| ------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `files`            |                       | **Required**, here or in the settings file. Where the locale files are, with `{locale}` in place of the language code. Several patterns can be given, one per line.                   |
-| `format`           | `json`                | The library that reads your messages. See [Formats](#formats).                                                                                                                        |
-| `base-locale`      | `en`                  | The locale every other locale is compared with.                                                                                                                                       |
-| `fail-on`          | `error`               | When the check fails: `error`, `warning` or `never`.                                                                                                                                  |
-| `fail-on-existing` | `false`               | Also fail on issues that existed before the pull request.                                                                                                                             |
-| `check-when`       | `locale-changes`      | `locale-changes` checks only pull requests that change locale files. `always` checks every pull request and lists the existing issues, which fail only with `fail-on-existing: true`. |
-| `comment`          | `true`                | Write a single pull request comment that is updated on every run.                                                                                                                     |
-| `annotations`      | `true`                | Mark issues on their line in the "Files changed" tab.                                                                                                                                 |
-| `ignore-keys`      |                       | Key patterns to skip, one per line or comma separated, such as `legacy.*`. Namespaces are part of the key: `billing.*` skips `locales/{locale}/billing.json`.                         |
-| `ignore-locales`   |                       | Locales to skip, such as a language that is still being translated.                                                                                                                   |
-| `ignore-values`    |                       | Values that may stay untranslated, such as brand names: `Google`, `OK`. One per line, and a line can contain commas. Matched against the whole value, ignoring case.                  |
-| `disable-checks`   |                       | Checks to turn off, by the names in [Checks](#checks).                                                                                                                                |
-| `config-file`      | `.localeguard.yml`    | Optional settings file.                                                                                                                                                               |
-| `github-token`     | `${{ github.token }}` | Token used to read the pull request and write the comment.                                                                                                                            |
+| Input              | Default               | Description                                                                                                                                                                                 |
+| ------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `files`            |                       | **Required**, here or in the settings file. Where the locale files are, with `{locale}` in place of the language code. Several patterns can be given, one per line.                         |
+| `format`           | `json`                | The library that reads your messages. See [Formats](#formats).                                                                                                                              |
+| `base-locale`      | `en`                  | The locale every other locale is compared with.                                                                                                                                             |
+| `base-file`        |                       | The base locale's file when its name has no locale code, such as `lang/main.json` next to `lang/main-ar.json`. See [A base file without a locale code](#a-base-file-without-a-locale-code). |
+| `fail-on`          | `error`               | When the check fails: `error`, `warning` or `never`.                                                                                                                                        |
+| `fail-on-existing` | `false`               | Also fail on issues that existed before the pull request.                                                                                                                                   |
+| `check-when`       | `locale-changes`      | `locale-changes` checks only pull requests that change locale files. `always` checks every pull request and lists the existing issues, which fail only with `fail-on-existing: true`.       |
+| `comment`          | `true`                | Write a single pull request comment that is updated on every run.                                                                                                                           |
+| `annotations`      | `true`                | Mark issues on their line in the "Files changed" tab.                                                                                                                                       |
+| `ignore-keys`      |                       | Key patterns to skip, one per line or comma separated, such as `legacy.*`. Namespaces are part of the key: `billing.*` skips `locales/{locale}/billing.json`.                               |
+| `ignore-locales`   |                       | Locales to skip, such as a language that is still being translated.                                                                                                                         |
+| `ignore-values`    |                       | Values that may stay untranslated, such as brand names: `Google`, `OK`. One per line, and a line can contain commas. Matched against the whole value, ignoring case.                        |
+| `disable-checks`   |                       | Checks to turn off, by the names in [Checks](#checks).                                                                                                                                      |
+| `config-file`      | `.localeguard.yml`    | Optional settings file.                                                                                                                                                                     |
+| `github-token`     | `${{ github.token }}` | Token used to read the pull request and write the comment.                                                                                                                                  |
 
 ### Settings file
 
@@ -226,15 +261,17 @@ Each demo is a small app with three open pull requests: one with mistakes on
 purpose, one that is fixed by a second commit, and one that does not touch
 translations.
 
-| Stack                        | Repository                                                                                                |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Nuxt with `@nuxtjs/i18n`     | [locale-guard-demo-nuxt](https://github.com/Mohamed-Almarag/locale-guard-demo-nuxt)                       |
-| Vue with YAML files          | [locale-guard-demo-vue-yaml](https://github.com/Mohamed-Almarag/locale-guard-demo-vue-yaml)               |
-| Vue with namespace files     | [locale-guard-demo-vue-namespaces](https://github.com/Mohamed-Almarag/locale-guard-demo-vue-namespaces)   |
-| Next.js with next-intl       | [locale-guard-demo-next](https://github.com/Mohamed-Almarag/locale-guard-demo-next)                       |
-| Next.js with namespace files | [locale-guard-demo-next-namespaces](https://github.com/Mohamed-Almarag/locale-guard-demo-next-namespaces) |
-| React with react-intl        | [locale-guard-demo-react-intl](https://github.com/Mohamed-Almarag/locale-guard-demo-react-intl)           |
-| React with react-i18next     | [locale-guard-demo-react-i18next](https://github.com/Mohamed-Almarag/locale-guard-demo-react-i18next)     |
+| Stack                             | Repository                                                                                                |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Nuxt with `@nuxtjs/i18n`          | [locale-guard-demo-nuxt](https://github.com/Mohamed-Almarag/locale-guard-demo-nuxt)                       |
+| Vue with YAML files               | [locale-guard-demo-vue-yaml](https://github.com/Mohamed-Almarag/locale-guard-demo-vue-yaml)               |
+| Vue with namespace files          | [locale-guard-demo-vue-namespaces](https://github.com/Mohamed-Almarag/locale-guard-demo-vue-namespaces)   |
+| Next.js with next-intl            | [locale-guard-demo-next](https://github.com/Mohamed-Almarag/locale-guard-demo-next)                       |
+| Next.js with namespace files      | [locale-guard-demo-next-namespaces](https://github.com/Mohamed-Almarag/locale-guard-demo-next-namespaces) |
+| React with react-intl             | [locale-guard-demo-react-intl](https://github.com/Mohamed-Almarag/locale-guard-demo-react-intl)           |
+| React with react-i18next          | [locale-guard-demo-react-i18next](https://github.com/Mohamed-Almarag/locale-guard-demo-react-i18next)     |
+| Rails with YAML files             | [locale-guard-demo-rails](https://github.com/Mohamed-Almarag/locale-guard-demo-rails)                     |
+| A base file without a locale code | [locale-guard-demo-base-file](https://github.com/Mohamed-Almarag/locale-guard-demo-base-file)             |
 
 ICU messages: plurals, a `select` argument and rich text tags.
 
@@ -262,6 +299,10 @@ breaks a message, and values copied from one language's file into another's.
   comment links to the job summary for the rest.
 - vue-i18n plurals (`one | many`) are not checked for missing forms, because
   their number of branches depends on custom rules.
+- Plural forms nested under a key in JSON
+  (`{ "items": { "one": …, "other": … } }`) are read as ordinary keys, because
+  each library that writes them has its own plural rules. They are checked as
+  plurals only in Rails YAML files.
 - Locale Guard does not know which keys your code uses, so it does not report
   unused keys or keys that the code uses but no file defines.
 

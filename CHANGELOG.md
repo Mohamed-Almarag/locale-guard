@@ -4,6 +4,44 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-10-17
+
+### Added
+
+- Rails locale files. A file wrapped in its locale key (`en:` at the top of
+  `en.yml`) is read without that key, and every file of a language (`en.yml`,
+  `devise.en.yml`) is merged into one tree. A missing key is placed in the file
+  that mirrors the base file, such as `devise.ar.yml`, and the copy-paste block
+  puts the locale key back on top.
+- Rails plurals in those files (`count.one`, `count.other`) are checked for the
+  forms each language needs. A form that covers a single number, such as Arabic
+  `two`, may write the number in words instead of `%{count}`.
+- `base-file` names the base locale's file when its name has no locale code,
+  such as `lang/main.json` next to `lang/main-ar.json`. A pull request that
+  changes only that file is checked too.
+
+### Changed
+
+- The message for values shared by two locales no longer says that one file was
+  probably copied into the other. It says the text differs from the base, and
+  that either one file was copied from the other or both still hold an older
+  base text.
+- Updated `@intlify/message-compiler` to 11.4.14 and `zod` to 4.6.7.
+
+### Fixed
+
+- A very large report stopped the run with "Maximum call stack size exceeded".
+  Mastodon, with about 125,000 issues, now runs to the end.
+- A placeholder name written in another script, such as `{الاسم}` or
+  `{{نماذج}}`, is reported as unexpected. Before, only the missing name was
+  reported.
+- Date and number formats such as `%b %d, %Y`, and printf placeholders such as
+  `%s`, are not read as words in the untranslated check. A value like `Team: %s`
+  that stays in English is no longer reported, because one word is left.
+- A file such as `themes.json` next to `en.json` is not read as a locale.
+- A language that Intl has no plural rules for is not checked for plural forms.
+  Before, it was checked with the rules of the machine's own language.
+
 ## [1.1.0] - 2026-10-13
 
 ### Added
@@ -100,6 +138,7 @@ First release.
 - `fail-on`, `fail-on-existing`, `ignore-keys`, `ignore-locales`,
   `ignore-values` and `disable-checks`.
 
+[1.2.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.1.0
 [1.0.3]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.3
 [1.0.2]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.2
