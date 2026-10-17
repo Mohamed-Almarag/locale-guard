@@ -56,6 +56,8 @@ export function memoryFileSource(files: Record<string, string>): FileSource {
 export interface LoadOptions {
   patterns: string[]
   baseLocale: string
+  // Read as the base locale; its name has no locale code
+  baseFile?: string
   ignoreLocales?: string[]
 }
 
@@ -82,6 +84,16 @@ export async function loadProject(
         files.push({ path, namespace: match.namespace })
       }
       found.set(match.locale, files)
+    }
+  }
+
+  if (options.baseFile) {
+    const path = options.baseFile.replace(/\\/g, '/').replace(/^\.\//, '')
+    const [exists] = await source.glob([path])
+    const files = found.get(options.baseLocale) ?? []
+    if (exists && !files.some((file) => file.path === exists)) {
+      files.push({ path: exists, namespace: '' })
+      found.set(options.baseLocale, files)
     }
   }
 

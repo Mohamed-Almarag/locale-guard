@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseJson } from '../../src/core/loaders/json.js'
 import { parseYaml } from '../../src/core/loaders/yaml.js'
+import { loadProject, memoryFileSource } from '../../src/core/loaders/index.js'
 import { json, load } from '../helpers.js'
 
 describe('parseJson', () => {
@@ -232,6 +233,37 @@ describe('loadProject', () => {
     const pt = project.locales.get('pt_BR')
     expect(pt?.files[0]?.root).toBe('pt-BR')
     expect([...(pt?.entries.keys() ?? [])]).toEqual(['cart.title'])
+  })
+
+  it('reads a base file named without its locale as the base locale', async () => {
+    const project = await loadProject(
+      memoryFileSource({
+        'lang/main.json': json({ a: 'A' }),
+        'lang/main-ar.json': json({ a: 'ا' }),
+        'lang/main-fr.json': json({ a: 'A-fr' })
+      }),
+      {
+        patterns: ['lang/main-{locale}.json'],
+        baseLocale: 'en',
+        baseFile: 'lang/main.json'
+      }
+    )
+    expect([...project.locales.keys()]).toEqual(['ar', 'en', 'fr'])
+    expect(project.locales.get('en')?.files).toEqual([
+      { path: 'lang/main.json', namespace: '' }
+    ])
+  })
+
+  it('loads nothing extra when the base file does not exist', async () => {
+    const project = await loadProject(
+      memoryFileSource({ 'lang/main-ar.json': json({ a: 'ا' }) }),
+      {
+        patterns: ['lang/main-{locale}.json'],
+        baseLocale: 'en',
+        baseFile: 'lang/main.json'
+      }
+    )
+    expect([...project.locales.keys()]).toEqual(['ar'])
   })
 
   it('unwraps JSON the same way', async () => {

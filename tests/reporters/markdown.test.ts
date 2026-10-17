@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { analyze } from '../../src/core/analyze.js'
 import type { Issue } from '../../src/core/types.js'
 import { MARKER, renderReport } from '../../src/reporters/markdown.js'
+import { loadProject, memoryFileSource } from '../../src/core/loaders/index.js'
 import { json, load } from '../helpers.js'
 
 async function report(
@@ -112,6 +113,29 @@ describe('renderReport', () => {
       'Copy-paste for config/locales/{locale}.yml (the same in each locale, under each locale key)'
     )
     expect(shared).toContain('```yaml\ncart:\n  empty: ""\n```')
+  })
+
+  it('names the shared file with {locale} wherever the code sits in the name', async () => {
+    const project = await loadProject(
+      memoryFileSource({
+        'lang/main.json': json({ a: 'A', b: 'B' }),
+        'lang/main-ar.json': json({ a: 'ا' }),
+        'lang/main-fr.json': json({ a: 'A-fr' })
+      }),
+      {
+        patterns: ['lang/main-{locale}.json'],
+        baseLocale: 'en',
+        baseFile: 'lang/main.json'
+      }
+    )
+    const body = renderReport({
+      issues: analyze(project, { format: 'json' }),
+      project,
+      hasBaseline: false
+    })
+    expect(body).toContain(
+      'Copy-paste for lang/main-{locale}.json (the same in each locale)'
+    )
   })
 
   it('puts a missing Rails key in the file that mirrors the base file', async () => {

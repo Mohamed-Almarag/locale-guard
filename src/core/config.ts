@@ -82,6 +82,20 @@ export const configSchema = z.strictObject({
         if (problem) ctx.addIssue({ code: 'custom', message: problem })
       }
     }),
+  // A base file named without its locale: lang/main.json next to lang/main-ar.json
+  'base-file': z
+    .string()
+    .trim()
+    .refine(
+      (path) => !path.includes('{locale}'),
+      'must be one file, without {locale}'
+    )
+    .refine(
+      (path) => /\.(json|ya?ml)$/i.test(path),
+      'must be a .json, .yml or .yaml file'
+    )
+    .transform((path) => path.replace(/\\/g, '/').replace(/^\.\//, ''))
+    .optional(),
   'fail-on': z.enum(['error', 'warning', 'never']).default('error'),
   'fail-on-existing': flag.default(false),
   'check-when': z.enum(['locale-changes', 'always']).default('locale-changes'),

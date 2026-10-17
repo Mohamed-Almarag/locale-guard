@@ -1,6 +1,7 @@
 import { stringify as toYaml } from 'yaml'
 import { namespaceOf } from '../core/checks/context.js'
 import { showKey } from '../core/key-label.js'
+import { replaceLocale } from '../core/locale-code.js'
 import { PLURAL_CATEGORIES } from '../core/plural-rules.js'
 import type { CheckId, Issue, Locale, Project } from '../core/types.js'
 
@@ -236,18 +237,9 @@ function renderSharedMissingKeys(
   return out
 }
 
-// `locales/ar/common.json` -> `locales/{locale}/common.json`
+// `locales/ar/common.json` -> `locales/{locale}/common.json`, `main-ar.json` -> `main-{locale}.json`
 function withLocalePlaceholder(path: string, locale: string): string {
-  return path
-    .split('/')
-    .map((segment) =>
-      segment === locale
-        ? '{locale}'
-        : segment.startsWith(`${locale}.`)
-          ? `{locale}${segment.slice(locale.length)}`
-          : segment
-    )
-    .join('/')
+  return replaceLocale(path, locale, '{locale}')
 }
 
 function location(issue: Issue, input: ReportInput): string {

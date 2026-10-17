@@ -27,6 +27,12 @@ inputs:
   base-locale:
     description: 'The locale every other locale is compared with. Default: en.'
     required: false
+  base-file:
+    description: >
+      The base locale's file, when its name has no locale code, e.g.
+      lang/main.json next to lang/main-ar.json, with files:
+      lang/main-{locale}.json.
+    required: false
   fail-on:
     description:
       'When the check fails: error, warning or never. Default: error.'
