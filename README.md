@@ -8,8 +8,9 @@ A GitHub Action that checks your translation files on every pull request, and
 tells you exactly what is missing or broken in each language before it reaches
 your users.
 
-It works with **vue-i18n** (and Nuxt), **ICU** messages (next-intl, react-intl)
-and **plain JSON** (i18next, react-i18next), in JSON or YAML files.
+It works with **vue-i18n** (and Nuxt), **ICU** messages (next-intl, react-intl),
+**plain JSON** (i18next, react-i18next) and **Rails** locale files, in JSON or
+YAML.
 
 <img src="docs/images/demo.gif" alt="Demo: the Locale Guard comment and line annotations on a Nuxt pull request, the ICU errors it reports on a Next.js pull request, and the supported libraries" width="800">
 
