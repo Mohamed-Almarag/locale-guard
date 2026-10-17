@@ -159,6 +159,14 @@ describe('untranslated', () => {
     )
     expect(issues).toEqual([])
   })
+
+  it('skips date and number formats, as Rails writes them', async () => {
+    const issues = await run('untranslated', {
+      'locales/en.json': json({ a: '%b %d, %Y', b: '%n %u', c: '%H:%M' }),
+      'locales/ar.json': json({ a: '%b %d, %Y', b: '%n %u', c: '%H:%M' })
+    })
+    expect(issues).toEqual([])
+  })
 })
 
 describe('untranslated: values shared by two locales', () => {
