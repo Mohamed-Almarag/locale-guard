@@ -1,6 +1,9 @@
 import { showKey } from '../key-label.js'
 import type { Issue } from '../types.js'
+import { pluralLocale } from '../locale-code.js'
+import { singleNumber } from '../plural-rules.js'
 import { type Check, baseEntryFor } from './context.js'
+import { keyFor } from './suffix-plurals.js'
 
 // Linked messages are skipped: translators often write the text instead
 export const placeholderMismatch: Check = (context) => {
@@ -16,13 +19,39 @@ export const placeholderMismatch: Check = (context) => {
       const actual = describe(entry.value)
       if (expected.error || actual.error) continue
 
-      const plural = Boolean(plurals?.of(key))
+      const form = plurals?.of(key)
       const comparable = (p: string) =>
-        isComparable(p) && !(plural && COUNT.has(p))
-      const want = expected.placeholders.filter(comparable)
+        isComparable(p) && !(form && COUNT.has(p))
       const have = actual.placeholders.filter(comparable)
-      const missing = want.filter((p) => !have.includes(p))
-      const unexpected = have.filter((p) => !want.includes(p))
+      let missing: string[]
+      let unexpected: string[]
+      if (form?.separator === '.') {
+        // Rails: the count's name varies (`%{friendly_count}`), so a form may
+        // drop it only when it covers one number, and may use any base form's
+        const forms = [...plurals!.forms(context.base, form).values()].map(
+          (formKey) => describe(context.base.entries.get(formKey)!.value)
+        )
+        if (forms.some((info) => info.error)) continue
+        const anyForm = new Set(forms.flatMap((info) => info.placeholders))
+        const other = context.base.entries.get(keyFor(form, 'other'))
+        const code = pluralLocale(target.code)
+        // Ruby I18n shows `zero` for 0 in every language. Without the
+        // language's rules there is nothing to prove a number is needed
+        const wordsAllowed =
+          form.category === 'zero' ||
+          (code ? singleNumber(code, form.category) : true)
+        const want = wordsAllowed
+          ? []
+          : describe(other?.value ?? baseEntry.value).placeholders.filter(
+              comparable
+            )
+        missing = want.filter((p) => !have.includes(p))
+        unexpected = have.filter((p) => !anyForm.has(p))
+      } else {
+        const want = expected.placeholders.filter(comparable)
+        missing = want.filter((p) => !have.includes(p))
+        unexpected = have.filter((p) => !want.includes(p))
+      }
       if (missing.length === 0 && unexpected.length === 0) continue
 
       const parts = [

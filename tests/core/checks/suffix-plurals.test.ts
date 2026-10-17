@@ -197,3 +197,196 @@ describe('i18next plural keys (plain JSON)', () => {
     ).toEqual(['items_zero', 'items_two', 'items_few', 'items_many'])
   })
 })
+
+describe('Rails plural forms (nested under the key)', () => {
+  const enYml = [
+    'en:',
+    '  items:',
+    '    one: "%{count} item"',
+    '    other: "%{count} items"',
+    '  filters:',
+    '    other: Other',
+    '    all: All',
+    ''
+  ].join('\n')
+
+  async function rails(ar: string) {
+    const project = await load(
+      { 'config/locales/en.yml': enYml, 'config/locales/ar.yml': ar },
+      { patterns: ['config/locales/{locale}.yml'] }
+    )
+    return summarize(analyze(project, { format: 'json' }))
+  }
+
+  it('accepts the six Arabic forms, and a form without the count', async () => {
+    const found = await rails(
+      [
+        'ar:',
+        '  items:',
+        '    zero: لا توجد عناصر',
+        '    one: عنصر واحد',
+        '    two: عنصران',
+        '    few: "%{count} عناصر"',
+        '    many: "%{count} عنصرًا"',
+        '    other: "%{count} عنصر"',
+        '  filters:',
+        '    other: أخرى',
+        '    all: الكل',
+        ''
+      ].join('\n')
+    )
+    expect(found).toEqual([])
+  })
+
+  it('reports the forms Arabic needs', async () => {
+    const found = await rails(
+      [
+        'ar:',
+        '  items:',
+        '    one: عنصر واحد',
+        '    other: "%{count} عنصر"',
+        '  filters:',
+        '    other: أخرى',
+        '    all: الكل',
+        ''
+      ].join('\n')
+    )
+    expect(found).toEqual([
+      'ar items:3 `items`: Arabic uses zero, one, two, few, many, other. Missing: `items.zero`, `items.two`, `items.few`, `items.many`'
+    ])
+  })
+
+  it('keeps a key named other next to other keys as a plain key', async () => {
+    const found = await rails(
+      'ar:\n  items:\n    other: "%{count} عنصر"\n  filters:\n    other: أخرى\n'
+    )
+    expect(found.filter((line) => line.includes('filters'))).toEqual([
+      'ar filters.all:4 Missing key `filters.all`'
+    ])
+  })
+
+  it('needs YAML files wrapped in their locale', async () => {
+    const plain = await load({
+      'locales/en.json': json({ items: { one: 'One', other: 'Many' } }),
+      'locales/ar.json': json({ items: { one: 'واحد', other: 'كثير' } })
+    })
+    const wrappedJson = await load({
+      'locales/en.json': json({ en: { items: { one: 'One', other: 'Many' } } }),
+      'locales/ar.json': json({ ar: { items: { one: 'واحد', other: 'كثير' } } })
+    })
+    for (const project of [plain, wrappedJson]) {
+      expect(
+        analyze(project, { format: 'json' }).filter(
+          (issue) => issue.check === 'plural-forms'
+        )
+      ).toEqual([])
+    }
+  })
+})
+
+describe('Rails plural forms: placeholders', () => {
+  const enYml = [
+    'en:',
+    '  shared:',
+    '    one: Shared one time',
+    '    other: Shared %{friendly_count} times',
+    '  people:',
+    '    zero: Nobody yet',
+    '    one: "%{people} person"',
+    '    other: "%{people} people"',
+    ''
+  ].join('\n')
+
+  async function placeholders(locale: string, body: string[]) {
+    const project = await load(
+      {
+        'config/locales/en.yml': enYml,
+        [`config/locales/${locale}.yml`]: [`${locale}:`, ...body, ''].join('\n')
+      },
+      { patterns: ['config/locales/{locale}.yml'] }
+    )
+    return summarize(
+      analyze(project, { format: 'json' }).filter(
+        (issue) => issue.check === 'placeholder-mismatch'
+      )
+    )
+  }
+
+  it('lets a form that covers one number write it in words', async () => {
+    // Hebrew `one` is only 1, `two` only 2; Ruby I18n uses `zero` for 0 in any language
+    expect(
+      await placeholders('he', [
+        '  shared:',
+        '    one: שותף פעם אחת',
+        '    two: שותף פעמיים',
+        '    other: "שותף %{friendly_count} פעמים"',
+        '  people:',
+        '    zero: אף אחד',
+        '    one: איש אחד',
+        '    two: שני אנשים',
+        '    other: "%{people} אנשים"'
+      ])
+    ).toEqual([])
+  })
+
+  it('lets a form use the count that another base form has', async () => {
+    expect(
+      await placeholders('be', [
+        '  shared:',
+        '    one: "Пашыраны %{friendly_count} раз"',
+        '    few: "Пашыраны %{friendly_count} разы"',
+        '    many: "Пашыраны %{friendly_count} разоў"',
+        '    other: "Пашыраны %{friendly_count} разоў"'
+      ])
+    ).toEqual([])
+  })
+
+  it('needs the number in a form that covers many numbers', async () => {
+    // Russian `one` is also used for 21, 31…
+    expect(
+      await placeholders('ru', [
+        '  shared:',
+        '    one: Поделились один раз',
+        '    few: "Поделились %{friendly_count} раза"',
+        '    many: "Поделились %{friendly_count} раз"',
+        '    other: "Поделились %{friendly_count} раз"'
+      ])
+    ).toEqual(['ru shared.one:3 `shared.one`: missing `{friendly_count}`'])
+  })
+
+  it('reports a placeholder that no base form has', async () => {
+    expect(
+      await placeholders('de', [
+        '  shared:',
+        '    one: "Einmal von %{name} geteilt"',
+        '    other: "%{friendly_count} Mal geteilt"'
+      ])
+    ).toEqual(['de shared.one:3 `shared.one`: unexpected `{name}`'])
+  })
+
+  it('does not judge the number for a language without plural rules', async () => {
+    expect(
+      await placeholders('sco', [
+        '  shared:',
+        '    one: Shared ae time',
+        '    other: "Shared %{friendly_count} times"'
+      ])
+    ).toEqual([])
+  })
+})
+
+describe('plural rules', () => {
+  it('skips plural forms of a language Intl has no rules for', async () => {
+    // `qaa` is reserved for private use, so no Intl version has its rules
+    const project = await load({
+      'locales/en.json': json({ items_one: 'One', items_other: 'Many' }),
+      'locales/qaa.json': json({ items_other: 'Multi' })
+    })
+    expect(project.locales.has('qaa')).toBe(true)
+    expect(
+      analyze(project, { format: 'json' }).filter(
+        (issue) => issue.check === 'plural-forms'
+      )
+    ).toEqual([])
+  })
+})

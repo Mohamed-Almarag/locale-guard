@@ -25,3 +25,20 @@ export function languageName(code: string): string {
     return code
   }
 }
+
+const singleCache = new Map<string, boolean>()
+
+// True when the form covers one whole number, like Hebrew `one` (1) or Arabic
+// `two` (2), so the number may be written in words. Belarusian `one` (1, 21, 31…) is not
+export function singleNumber(locale: string, category: string): boolean {
+  const id = `${locale}|${category}`
+  const cached = singleCache.get(id)
+  if (cached !== undefined) return cached
+  const rules = new Intl.PluralRules(locale)
+  let count = 0
+  for (let n = 0; n <= 1000 && count < 2; n++) {
+    if (rules.select(n) === category) count++
+  }
+  singleCache.set(id, count === 1)
+  return count === 1
+}

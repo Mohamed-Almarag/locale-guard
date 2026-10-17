@@ -36,6 +36,8 @@ const SCRIPTS: Record<string, { name: string; letters: RegExp }> = {
 }
 
 const URL_OR_EMAIL = /\b(?:https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
+// Date and number formats, e.g. Rails `%b %d, %Y` and `%n %u`
+const FORMAT_DIRECTIVE = /%[-_0^#:]*[A-Za-z]/g
 const LETTER = /\p{L}/u
 // e.g. comments.xlsx, usually the same in every language
 const FILE_NAME =
@@ -86,8 +88,7 @@ const perValue: Check = (context) => {
       if (text === undefined || !LETTER.test(text)) continue
 
       // Plurals count one branch: `ticket | tickets` is one word
-      const shown =
-        describe(entry.value).longestText?.replace(URL_OR_EMAIL, ' ') ?? text
+      const shown = withoutCode(describe(entry.value).longestText ?? text)
       let message: string | undefined
       if (
         language !== baseLanguage &&
@@ -156,7 +157,7 @@ const sharedValues: Check = ({ base, targets, describe, ignoreValues }) => {
         key: '',
         line: entry.line,
         column: entry.column,
-        message: `${first.code} and ${second.code} have identical values, so one file was probably copied into the other`,
+        message: `${first.code} and ${second.code} have the same text in several keys, different from ${base.code}. One file may be copied from the other, or both may still have an older ${base.code} text`,
         details: shared.map(
           (key) => `${showKey(key)}: ${first.entries.get(key)?.value.trim()}`
         ),
@@ -185,9 +186,13 @@ function visibleText(
   value: string
 ): string | undefined {
   const info = describe(value)
-  return info.error ? undefined : info.text.replace(URL_OR_EMAIL, ' ')
+  return info.error ? undefined : withoutCode(info.text)
 }
 
 function ignoredSet(values: string[]): Set<string> {
   return new Set(values.map((value) => value.trim().toLowerCase()))
+}
+
+function withoutCode(text: string): string {
+  return text.replace(URL_OR_EMAIL, ' ').replace(FORMAT_DIRECTIVE, ' ')
 }

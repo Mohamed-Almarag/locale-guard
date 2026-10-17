@@ -111,5 +111,16 @@ describe('describePlainMessage', () => {
     expect(describePlainMessage('Use { and } carefully').placeholders).toEqual(
       []
     )
+    expect(describePlainMessage('{نص عادي}').placeholders).toEqual([])
+  })
+
+  it('reads translated placeholder names in any script', () => {
+    expect(describePlainMessage('مرحبا {الاسم}').placeholders).toEqual([
+      '{الاسم}'
+    ])
+    expect(describePlainMessage('تم {{ نماذج }}').placeholders).toEqual([
+      '{{نماذج}}'
+    ])
+    expect(describePlainMessage('नमस्ते {नाम}').placeholders).toEqual(['{नाम}'])
   })
 })
