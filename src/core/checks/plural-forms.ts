@@ -1,6 +1,6 @@
 import { showKey } from '../key-label.js'
 import type { Issue, Locale } from '../types.js'
-import { intlLocale } from '../locale-code.js'
+import { pluralLocale } from '../locale-code.js'
 import { languageName, requiredCategories } from '../plural-rules.js'
 import type { Check, CheckContext } from './context.js'
 import { keyFor, neededForms } from './suffix-plurals.js'
@@ -20,7 +20,7 @@ function icuPlurals({ base, targets, describe }: CheckContext): Issue[] {
   const issues: Issue[] = []
 
   for (const locale of [base, ...targets]) {
-    const code = intlLocale(locale.code)
+    const code = pluralLocale(locale.code)
     if (!code) continue
 
     for (const [key, entry] of locale.entries) {
@@ -56,7 +56,7 @@ function suffixPlurals({ base, targets, plurals }: CheckContext): Issue[] {
   const issues: Issue[] = []
 
   for (const locale of [base, ...targets]) {
-    const code = intlLocale(locale.code)
+    const code = pluralLocale(locale.code)
     for (const plural of plurals.stems(base)) {
       const forms = plurals.forms(locale, plural)
       // A group with no form at all is reported by missing-keys

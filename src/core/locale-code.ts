@@ -18,6 +18,15 @@ export function isLocaleCode(code: string): boolean {
   return Boolean(intlLocale(code)) && /^[a-z]{2,3}$/i.test(languageOf(code))
 }
 
+// Undefined when Intl has no plural rules for it: `new Intl.PluralRules('ie')`
+// would quietly use the machine's language instead
+export function pluralLocale(code: string): string | undefined {
+  const locale = intlLocale(code)
+  return locale && Intl.PluralRules.supportedLocalesOf(locale).length
+    ? locale
+    : undefined
+}
+
 // The code wherever it stands alone in the path: `locales/ar/x.json`,
 // `devise.ar.yml`, `main-ar.json`
 export function replaceLocale(path: string, from: string, to: string): string {

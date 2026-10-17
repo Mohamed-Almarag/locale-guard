@@ -49,7 +49,7 @@ export function sortIssues(issues: Issue[]): Issue[] {
 }
 
 const PLURAL_FORM = new RegExp(
-  `^(.+_(?:ordinal_)?)(${PLURAL_CATEGORIES.join('|')})$`
+  `^(.+[_.](?:ordinal_)?)(${PLURAL_CATEGORIES.join('|')})$`
 )
 
 // Alphabetical, but plural forms of one key keep CLDR order (zero … other)

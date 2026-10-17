@@ -32,7 +32,7 @@ const LABELS: Record<CheckId, [singular: string, plural: string]> = {
 
 const CHECK_ORDER = Object.keys(LABELS) as CheckId[]
 const PLURAL_SUFFIX = new RegExp(
-  `_(ordinal_)?(?:${PLURAL_CATEGORIES.filter((c) => c !== 'other').join('|')})$`
+  `([_.])(ordinal_)?(?:${PLURAL_CATEGORIES.filter((c) => c !== 'other').join('|')})$`
 )
 const RESERVED = 400
 
@@ -289,7 +289,7 @@ function hasParent(locale: Locale, key: string): boolean {
 function baseEntryOf(base: Locale | undefined, key: string) {
   return (
     base?.entries.get(key) ??
-    base?.entries.get(key.replace(PLURAL_SUFFIX, '_$1other'))
+    base?.entries.get(key.replace(PLURAL_SUFFIX, '$1$2other'))
   )
 }
 
