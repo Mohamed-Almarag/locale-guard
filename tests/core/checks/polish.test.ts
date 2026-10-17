@@ -189,7 +189,7 @@ describe('untranslated: values shared by two locales', () => {
         line: 2,
         column: 3,
         message:
-          'fr and tr have identical values, so one file was probably copied into the other',
+          'fr and tr have the same text in several keys, different from en. One file may be copied from the other, or both may still have an older en text',
         details: ['`title`: Şifre Değiştir', '`done`: Şifre Değiştirildi'],
         isNew: true
       }
@@ -309,7 +309,7 @@ describe('untranslated: values shared by two locales', () => {
       'locales/tr.json': json(italian)
     })
     expect(summarize(issues)).toEqual([
-      'it locales/it.json:2 it and tr have identical values, so one file was probably copied into the other'
+      'it locales/it.json:2 it and tr have the same text in several keys, different from en. One file may be copied from the other, or both may still have an older en text'
     ])
   })
 

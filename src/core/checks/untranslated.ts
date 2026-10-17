@@ -156,7 +156,7 @@ const sharedValues: Check = ({ base, targets, describe, ignoreValues }) => {
         key: '',
         line: entry.line,
         column: entry.column,
-        message: `${first.code} and ${second.code} have identical values, so one file was probably copied into the other`,
+        message: `${first.code} and ${second.code} have the same text in several keys, different from ${base.code}. One file may be copied from the other, or both may still have an older ${base.code} text`,
         details: shared.map(
           (key) => `${showKey(key)}: ${first.entries.get(key)?.value.trim()}`
         ),

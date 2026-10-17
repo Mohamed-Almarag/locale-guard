@@ -290,7 +290,7 @@ describe('renderReport', () => {
     })
     expect(body).toContain(
       [
-        '- fr and tr have identical values, so one file was probably copied into the other · [fr.json:2](https://x/locales/fr.json#L2)',
+        '- fr and tr have the same text in several keys, different from en. One file may be copied from the other, or both may still have an older en text · [fr.json:2](https://x/locales/fr.json#L2)',
         '  <details><summary>2 keys</summary>',
         '',
         '  - `a`: Şifre Değiştir',
