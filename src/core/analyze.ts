@@ -20,7 +20,9 @@ export function analyze(project: Project, options: AnalyzeOptions): Issue[] {
   const context = createContext(project, options.format, options.ignoreValues)
   if (context) {
     for (const [id, check] of Object.entries(checks)) {
-      if (!disabled.has(id as CheckId)) issues.push(...check(context))
+      if (disabled.has(id as CheckId)) continue
+      // A spread overflows the stack past about 100k issues
+      for (const issue of check(context)) issues.push(issue)
     }
   }
 

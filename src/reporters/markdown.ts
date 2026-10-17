@@ -154,7 +154,7 @@ function mergeMissingKeys(groups: Group[]): Group[] {
     const same = bySignature.get(signature)
     if (same) {
       same.locales.push(group.locale)
-      same.issues.push(...group.issues)
+      for (const issue of group.issues) same.issues.push(issue)
     } else {
       const copy = {
         ...group,
