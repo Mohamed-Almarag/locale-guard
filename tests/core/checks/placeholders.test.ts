@@ -188,6 +188,17 @@ describe('placeholder-mismatch: plain JSON', () => {
       '`a`: missing `{{name}}`, unexpected `{name}`'
     )
   })
+
+  it('reports a translated placeholder name as unexpected', async () => {
+    const issues = await run('placeholder-mismatch', {
+      'locales/en.json': json({ a: 'Hi {name}', b: 'Added {{ models }}' }),
+      'locales/ar.json': json({ a: 'مرحبا {الاسم}', b: 'تم {{ نماذج }}' })
+    })
+    expect(summarize(issues)).toEqual([
+      'ar a:2 `a`: missing `{name}`, unexpected `{الاسم}`',
+      'ar b:3 `b`: missing `{{models}}`, unexpected `{{نماذج}}`'
+    ])
+  })
 })
 
 describe('invalid-syntax', () => {
