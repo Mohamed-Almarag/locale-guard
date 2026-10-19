@@ -69961,7 +69961,7 @@ function describePlainMessage(source) {
 }
 
 /*!
-  * shared v11.4.14
+  * shared v11.4.16
   * (c) 2026 kazuya kawaguchi
   * Released under the MIT License.
   */
@@ -69988,7 +69988,7 @@ const assign = Object.assign;
 const isObject$1 = (val) => val !== null && typeof val === 'object';
 
 /*!
-  * message-compiler v11.4.14
+  * message-compiler v11.4.16
   * (c) 2026 kazuya kawaguchi
   * Released under the MIT License.
   */
