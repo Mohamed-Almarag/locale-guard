@@ -186,7 +186,7 @@ describe('placeholder-mismatch: ICU with ignore-tags', () => {
   })
 })
 
-describe('placeholder-mismatch: keys-as-text', () => {
+describe('keys-as-text', () => {
   const files = {
     'locales/en.json': json({
       'Hello {{name}}': '',
@@ -214,6 +214,48 @@ describe('placeholder-mismatch: keys-as-text', () => {
     const issues = await run('placeholder-mismatch', files)
     expect(summarize(issues)).toEqual([
       'ar Hello {{name}}:2 `Hello {{name}}`: unexpected `{{name}}`'
+    ])
+  })
+
+  it('drops the i18next plural suffix from the key', async () => {
+    const issues = await run(
+      'placeholder-mismatch',
+      {
+        'locales/en.json': json({
+          '{{count}} files_one': '',
+          '{{count}} files_other': ''
+        }),
+        'locales/ar.json': json({
+          '{{count}} files_one': 'ملف واحد',
+          '{{count}} files_other': '{{num}} ملفات'
+        })
+      },
+      { keysAsText: true }
+    )
+    expect(summarize(issues)).toEqual([
+      'ar {{count}} files_other:3 `{{count}} files_other`: unexpected `{{num}}`'
+    ])
+    expect(issues[0]?.baseValue).toBe('{{count}} files')
+  })
+
+  it('reports a plural key copied with its suffix as untranslated', async () => {
+    const issues = await run(
+      'untranslated',
+      {
+        'locales/en.json': json({
+          'Every {{count}} hours_one': '',
+          'Every {{count}} hours_other': ''
+        }),
+        'locales/fr.json': json({
+          'Every {{count}} hours_one': 'Every {{count}} hours_one',
+          'Every {{count}} hours_other': 'Every {{count}} hours'
+        })
+      },
+      { keysAsText: true }
+    )
+    expect(summarize(issues)).toEqual([
+      'fr Every {{count}} hours_one:2 `Every {{count}} hours_one`: same text as en',
+      'fr Every {{count}} hours_other:3 `Every {{count}} hours_other`: same text as en'
     ])
   })
 

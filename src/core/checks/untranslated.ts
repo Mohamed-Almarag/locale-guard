@@ -69,7 +69,7 @@ export const untranslated: Check = (context) => [
 ]
 
 const perValue: Check = (context) => {
-  const { base, targets, describe, ignoreValues } = context
+  const { base, targets, describe, ignoreValues, keysAsText } = context
   const ignored = ignoredSet(ignoreValues)
   const baseLanguage = languageOf(base.code)
   const issues: Issue[] = []
@@ -90,11 +90,11 @@ const perValue: Check = (context) => {
       // Plurals count one branch: `ticket | tickets` is one word
       const shown = withoutCode(describe(entry.value).longestText ?? text)
       let message: string | undefined
-      if (
-        language !== baseLanguage &&
-        value === baseEntry.value.trim() &&
-        wordCount(shown) >= 2
-      ) {
+      // With keys-as-text, a copied plural key keeps its suffix: `{{count}} files_one`
+      const copied =
+        value === baseEntry.value.trim() ||
+        (keysAsText && value === entry.filePath.at(-1))
+      if (language !== baseLanguage && copied && wordCount(shown) >= 2) {
         message = `${showKey(key)}: same text as ${base.code}`
       } else if (script && !script.letters.test(text)) {
         message = `${showKey(key)}: no ${script.name} letters, looks untranslated`

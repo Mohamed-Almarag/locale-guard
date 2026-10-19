@@ -20,6 +20,7 @@ export interface CheckContext {
   // Cached per message
   describe: (source: string) => MessageInfo
   ignoreValues: string[]
+  keysAsText: boolean
   // Plain JSON only: i18next `items_one`, `items_other`
   plurals?: SuffixPlurals
 }
@@ -40,7 +41,8 @@ export function createContext(
 ): CheckContext | undefined {
   const loaded = project.locales.get(project.baseLocale)
   if (!loaded) return undefined
-  const base = keysAsText ? withKeysAsText(loaded) : loaded
+  const plurals = format === 'json' ? new SuffixPlurals(loaded) : undefined
+  const base = keysAsText ? withKeysAsText(loaded, plurals) : loaded
   const targets = [...project.locales.values()].filter(
     (locale) => locale.code !== base.code
   )
@@ -51,20 +53,24 @@ export function createContext(
     targets,
     describe: createDescriber(format, { ignoreTags }),
     ignoreValues,
-    plurals: format === 'json' ? new SuffixPlurals(base) : undefined
+    keysAsText,
+    plurals
   }
 }
 
 // An empty base value means the key is the text: { "Save": "" }
-function withKeysAsText(locale: Locale): Locale {
+function withKeysAsText(locale: Locale, plurals?: SuffixPlurals): Locale {
   const entries = new Map<string, Entry>()
   for (const [key, entry] of locale.entries) {
-    entries.set(
-      key,
-      entry.value.trim() === ''
-        ? { ...entry, value: entry.filePath.at(-1) ?? key }
-        : entry
-    )
+    if (entry.value.trim() !== '') {
+      entries.set(key, entry)
+      continue
+    }
+    const text = entry.filePath.at(-1) ?? key
+    // i18next shows `{{count}} files` for an empty `{{count}} files_one`
+    const plural = plurals?.of(key)
+    const suffix = plural ? key.length - plural.stem.length : 0
+    entries.set(key, { ...entry, value: text.slice(0, text.length - suffix) })
   }
   return { ...locale, entries }
 }
