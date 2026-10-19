@@ -198,6 +198,16 @@ describe('run', () => {
     expect(mocks.summary.text).toContain('### ❌ ar: 1 missing key')
   })
 
+  it('reads ignore-tags from the inputs', async () => {
+    setup({ inputs: { 'ignore-tags': 'true' } })
+
+    await run()
+
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'Locale Guard settings are not valid:\nInvalid "ignore-tags": works only with ICU messages: format icu, next-intl, use-intl, react-intl or formatjs (got "true")'
+    )
+  })
+
   it('fails with a clear message for invalid settings', async () => {
     setup({ inputs: { 'fail-on': 'sometimes' } })
 

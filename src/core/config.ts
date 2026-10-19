@@ -62,7 +62,7 @@ const valueList = z
 
 const flag = z.union([z.boolean(), z.stringbool()])
 
-export const configSchema = z.strictObject({
+const settings = z.strictObject({
   format: z
     .string()
     .trim()
@@ -104,7 +104,19 @@ export const configSchema = z.strictObject({
   'ignore-keys': list.default([]),
   'ignore-locales': list.default([]),
   'ignore-values': valueList.default([]),
-  'disable-checks': list.pipe(z.array(z.enum(CHECK_IDS))).default([])
+  'disable-checks': list.pipe(z.array(z.enum(CHECK_IDS))).default([]),
+  'ignore-tags': flag.default(false)
+})
+
+export const configSchema = settings.superRefine((config, ctx) => {
+  if (config['ignore-tags'] && config.format !== 'next-intl') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['ignore-tags'],
+      message:
+        'works only with ICU messages: format icu, next-intl, use-intl, react-intl or formatjs'
+    })
+  }
 })
 
 export type Config = z.output<typeof configSchema>

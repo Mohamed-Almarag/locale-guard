@@ -95,6 +95,22 @@ describe('describeIcuMessage', () => {
     )
     expect(describeIcuMessage('<b>bold').error).toMatch(/^Invalid ICU message/)
   })
+
+  it('reads tags as plain text with ignoreTags, keeping arguments', () => {
+    const info = describeIcuMessage(
+      'Read <a href="https://example.com">the policy</a> and <b>{name}</b>',
+      { ignoreTags: true }
+    )
+    expect(info.error).toBeUndefined()
+    expect(info.placeholders).toEqual(['{name}'])
+    expect(info.text).toBe('Read the policy and')
+  })
+
+  it('still reports broken ICU syntax with ignoreTags', () => {
+    expect(describeIcuMessage('Hi {name', { ignoreTags: true }).error).toMatch(
+      /^Invalid ICU message: expect argument closing brace/
+    )
+  })
 })
 
 describe('describePlainMessage', () => {

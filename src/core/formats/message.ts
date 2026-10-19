@@ -5,6 +5,11 @@ export interface PluralInfo {
   options: string[]
 }
 
+export interface DescribeOptions {
+  // ICU only: tags are plain text
+  ignoreTags?: boolean
+}
+
 export interface MessageInfo {
   // As written (`{name}`, `<link>`, `@:common.save`), sorted and unique
   placeholders: string[]

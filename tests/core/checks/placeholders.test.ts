@@ -170,6 +170,22 @@ describe('placeholder-mismatch: ICU', () => {
   })
 })
 
+describe('placeholder-mismatch: ICU with ignore-tags', () => {
+  it('compares arguments but not tags, which are plain text', async () => {
+    const issues = await run(
+      'placeholder-mismatch',
+      {
+        'locales/en.json': json({ a: '<b>{name}</b> joined' }),
+        'locales/ar.json': json({ a: 'انضم {nom}' })
+      },
+      { ...icu, ignoreTags: true }
+    )
+    expect(summarize(issues)).toEqual([
+      'ar a:2 `a`: missing `{name}`, unexpected `{nom}`'
+    ])
+  })
+})
+
 describe('placeholder-mismatch: plain JSON', () => {
   it('passes when {name} and {{name}} placeholders match', async () => {
     const issues = await run('placeholder-mismatch', {
@@ -236,6 +252,19 @@ describe('invalid-syntax', () => {
       { severity: 'error', locale: 'ar', key: 'a', line: 2 }
     ])
     expect(issues[0]?.message).toMatch(/^`a`: Invalid ICU message: /)
+  })
+
+  it('reports HTML in an ICU message unless ignore-tags is on', async () => {
+    const files = {
+      'locales/en.json': json({ a: 'Read <a href="https://x.com">this</a>' }),
+      'locales/ar.json': json({ a: 'اقرأ <a href="https://x.com">هذا</a>' })
+    }
+    const strict = await run('invalid-syntax', files, icu)
+    expect(strict.map((i) => i.locale)).toEqual(['ar', 'en'])
+    expect(strict[0]?.message).toMatch(/invalid tag/)
+    expect(
+      await run('invalid-syntax', files, { ...icu, ignoreTags: true })
+    ).toEqual([])
   })
 
   it('never reports plain JSON messages', async () => {

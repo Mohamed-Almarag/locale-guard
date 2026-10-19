@@ -4,17 +4,27 @@ import {
   parse
 } from '@formatjs/icu-messageformat-parser'
 import {
+  type DescribeOptions,
   type MessageInfo,
   type PluralInfo,
   finalize,
   mostWords
 } from './message.js'
 
-export function describeIcuMessage(source: string): MessageInfo {
+// Markup in the text when tags are read as text, as intl-messageformat's ignoreTag does
+const MARKUP = /<\/?[^<>]*>/g
+
+export function describeIcuMessage(
+  source: string,
+  { ignoreTags = false }: DescribeOptions = {}
+): MessageInfo {
   let elements: MessageFormatElement[]
   try {
     // plural-forms reports a missing `other` with a clearer message
-    elements = parse(source, { requiresOtherClause: false })
+    elements = parse(source, {
+      requiresOtherClause: false,
+      ignoreTag: ignoreTags
+    })
   } catch (error) {
     const location = (error as { location?: { start?: { column?: number } } })
       .location
@@ -70,13 +80,17 @@ export function describeIcuMessage(source: string): MessageInfo {
   }
 
   walk(elements)
+  const clean = (value: string) =>
+    (ignoreTags ? value.replace(MARKUP, ' ') : value)
+      .replace(/\s+/g, ' ')
+      .trim()
   return finalize({
     placeholders,
     linkedKeys: [],
     plurals,
-    text: text.replace(/\s+/g, ' ').trim(),
+    text: clean(text),
     longestText: hasBranches(elements)
-      ? longestRendering(elements).replace(/\s+/g, ' ').trim()
+      ? clean(longestRendering(elements))
       : undefined
   })
 }

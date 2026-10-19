@@ -69846,11 +69846,16 @@ function finalize$1(info) {
     };
 }
 
-function describeIcuMessage(source) {
+// Markup in the text when tags are read as text, as intl-messageformat's ignoreTag does
+const MARKUP = /<\/?[^<>]*>/g;
+function describeIcuMessage(source, { ignoreTags = false } = {}) {
     let elements;
     try {
         // plural-forms reports a missing `other` with a clearer message
-        elements = parse$4(source, { requiresOtherClause: false });
+        elements = parse$4(source, {
+            requiresOtherClause: false,
+            ignoreTag: ignoreTags
+        });
     }
     catch (error) {
         const location = error
@@ -69906,13 +69911,16 @@ function describeIcuMessage(source) {
         }
     };
     walk(elements);
+    const clean = (value) => (ignoreTags ? value.replace(MARKUP, ' ') : value)
+        .replace(/\s+/g, ' ')
+        .trim();
     return finalize$1({
         placeholders,
         linkedKeys: [],
         plurals,
-        text: text.replace(/\s+/g, ' ').trim(),
+        text: clean(text),
         longestText: hasBranches(elements)
-            ? longestRendering(elements).replace(/\s+/g, ' ').trim()
+            ? clean(longestRendering(elements))
             : undefined
     });
 }
@@ -71205,13 +71213,13 @@ const describers = {
     json: describePlainMessage
 };
 // Parses each distinct message once
-function createDescriber(format) {
+function createDescriber(format, options = {}) {
     const describe = describers[format];
     const cache = new Map();
     return (source) => {
         let info = cache.get(source);
         if (!info) {
-            info = describe(source);
+            info = describe(source, options);
             cache.set(source, info);
         }
         return info;
@@ -71395,7 +71403,7 @@ function groupId(plural) {
     return `${plural.stem}|${plural.separator}|${plural.ordinal}`;
 }
 
-function createContext(project, format, ignoreValues = []) {
+function createContext(project, { format, ignoreValues = [], ignoreTags = false }) {
     const base = project.locales.get(project.baseLocale);
     if (!base)
         return undefined;
@@ -71405,7 +71413,7 @@ function createContext(project, format, ignoreValues = []) {
         format,
         base,
         targets,
-        describe: createDescriber(format),
+        describe: createDescriber(format, { ignoreTags }),
         ignoreValues,
         plurals: format === 'json' ? new SuffixPlurals(base) : undefined
     };
@@ -72009,7 +72017,7 @@ const checks = {
 function analyze(project, options) {
     const disabled = new Set(options.disabledChecks ?? []);
     const issues = disabled.has('parse-error') ? [] : [...project.parseErrors];
-    const context = createContext(project, options.format, options.ignoreValues);
+    const context = createContext(project, options);
     if (context) {
         for (const [id, check] of Object.entries(checks)) {
             if (disabled.has(id))
@@ -84915,7 +84923,7 @@ const valueList = union([array(string()), string()])
     return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
 });
 const flag = union([boolean(), stringbool()]);
-const configSchema = strictObject({
+const settings = strictObject({
     format: string()
         .trim()
         .toLowerCase()
@@ -84947,7 +84955,17 @@ const configSchema = strictObject({
     'ignore-keys': list.default([]),
     'ignore-locales': list.default([]),
     'ignore-values': valueList.default([]),
-    'disable-checks': list.pipe(array(_enum(CHECK_IDS))).default([])
+    'disable-checks': list.pipe(array(_enum(CHECK_IDS))).default([]),
+    'ignore-tags': flag.default(false)
+});
+const configSchema = settings.superRefine((config, ctx) => {
+    if (config['ignore-tags'] && config.format !== 'next-intl') {
+        ctx.addIssue({
+            code: 'custom',
+            path: ['ignore-tags'],
+            message: 'works only with ICU messages: format icu, next-intl, use-intl, react-intl or formatjs'
+        });
+    }
 });
 // An input that was set wins over the config file
 function parseConfig(inputs, file) {
@@ -87680,7 +87698,8 @@ const INPUTS = [
     'ignore-keys',
     'ignore-locales',
     'ignore-values',
-    'disable-checks'
+    'disable-checks',
+    'ignore-tags'
 ];
 async function run() {
     try {
@@ -87800,7 +87819,8 @@ function analyzeOptions(config) {
         format: config.format,
         disabledChecks: config['disable-checks'],
         ignoreKeys: config['ignore-keys'],
-        ignoreValues: config['ignore-values']
+        ignoreValues: config['ignore-values'],
+        ignoreTags: config['ignore-tags']
     };
 }
 // Undefined when there is none, a message when it is broken

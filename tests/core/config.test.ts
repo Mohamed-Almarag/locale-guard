@@ -23,7 +23,8 @@ describe('parseConfig', () => {
           'ignore-keys': [],
           'ignore-locales': [],
           'ignore-values': [],
-          'disable-checks': []
+          'disable-checks': [],
+          'ignore-tags': false
         }
       }
     )
@@ -159,6 +160,28 @@ describe('parseConfig', () => {
     ).toMatchObject({
       ok: false,
       errors: [expect.stringContaining('must be a .json, .yml or .yaml file')]
+    })
+  })
+
+  it('accepts ignore-tags for ICU formats only', () => {
+    expect(
+      parseConfig({
+        files: 'l/{locale}.json',
+        format: 'react-intl',
+        'ignore-tags': 'true'
+      })
+    ).toMatchObject({ ok: true, config: { 'ignore-tags': true } })
+    expect(
+      parseConfig({
+        files: 'l/{locale}.json',
+        format: 'vue-i18n',
+        'ignore-tags': 'true'
+      })
+    ).toEqual({
+      ok: false,
+      errors: [
+        'Invalid "ignore-tags": works only with ICU messages: format icu, next-intl, use-intl, react-intl or formatjs (got "true")'
+      ]
     })
   })
 
