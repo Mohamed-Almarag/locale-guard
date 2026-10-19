@@ -12,6 +12,8 @@ export interface AnalyzeOptions {
   ignoreValues?: string[]
   // ICU only: tags are plain text
   ignoreTags?: boolean
+  // An empty base value means the key is the text
+  keysAsText?: boolean
 }
 
 // Pure: never touches files or GitHub

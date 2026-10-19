@@ -82,6 +82,11 @@ inputs:
       projects that format messages with intl-messageformat's ignoreTag option.
       Default: false.
     required: false
+  keys-as-text:
+    description: >
+      For projects whose keys are the base text, e.g. "Save": "" in en.json: an
+      empty base value is read as its key. Default: false.
+    required: false
   config-file:
     description:
       'Optional settings file. Inputs that are set win over it. Default:

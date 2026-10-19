@@ -51,7 +51,8 @@ const INPUTS = [
   'ignore-locales',
   'ignore-values',
   'disable-checks',
-  'ignore-tags'
+  'ignore-tags',
+  'keys-as-text'
 ] as const
 
 export async function run(): Promise<void> {
@@ -226,7 +227,8 @@ function analyzeOptions(config: Config): AnalyzeOptions {
     disabledChecks: config['disable-checks'],
     ignoreKeys: config['ignore-keys'],
     ignoreValues: config['ignore-values'],
-    ignoreTags: config['ignore-tags']
+    ignoreTags: config['ignore-tags'],
+    keysAsText: config['keys-as-text']
   }
 }
 

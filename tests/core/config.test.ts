@@ -24,7 +24,8 @@ describe('parseConfig', () => {
           'ignore-locales': [],
           'ignore-values': [],
           'disable-checks': [],
-          'ignore-tags': false
+          'ignore-tags': false,
+          'keys-as-text': false
         }
       }
     )
