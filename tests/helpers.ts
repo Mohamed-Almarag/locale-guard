@@ -25,12 +25,14 @@ export async function run(
     baseLocale?: string
     format?: Format
     ignoreTags?: boolean
+    keysAsText?: boolean
   } = {}
 ): Promise<Issue[]> {
   const project = await load(files, options)
   return analyze(project, {
     format: options.format ?? 'json',
-    ignoreTags: options.ignoreTags
+    ignoreTags: options.ignoreTags,
+    keysAsText: options.keysAsText
   }).filter((issue) => issue.check === check)
 }
 

@@ -71403,10 +71403,11 @@ function groupId(plural) {
     return `${plural.stem}|${plural.separator}|${plural.ordinal}`;
 }
 
-function createContext(project, { format, ignoreValues = [], ignoreTags = false }) {
-    const base = project.locales.get(project.baseLocale);
-    if (!base)
+function createContext(project, { format, ignoreValues = [], ignoreTags = false, keysAsText = false }) {
+    const loaded = project.locales.get(project.baseLocale);
+    if (!loaded)
         return undefined;
+    const base = keysAsText ? withKeysAsText(loaded) : loaded;
     const targets = [...project.locales.values()].filter((locale) => locale.code !== base.code);
     return {
         project,
@@ -71417,6 +71418,16 @@ function createContext(project, { format, ignoreValues = [], ignoreTags = false 
         ignoreValues,
         plurals: format === 'json' ? new SuffixPlurals(base) : undefined
     };
+}
+// An empty base value means the key is the text: { "Save": "" }
+function withKeysAsText(locale) {
+    const entries = new Map();
+    for (const [key, entry] of locale.entries) {
+        entries.set(key, entry.value.trim() === ''
+            ? { ...entry, value: entry.filePath.at(-1) ?? key }
+            : entry);
+    }
+    return { ...locale, entries };
 }
 // The same key, or the base `other` form for a plural form the base lacks
 function baseEntryFor({ base, plurals }, key) {
@@ -84956,7 +84967,8 @@ const settings = strictObject({
     'ignore-locales': list.default([]),
     'ignore-values': valueList.default([]),
     'disable-checks': list.pipe(array(_enum(CHECK_IDS))).default([]),
-    'ignore-tags': flag.default(false)
+    'ignore-tags': flag.default(false),
+    'keys-as-text': flag.default(false)
 });
 const configSchema = settings.superRefine((config, ctx) => {
     if (config['ignore-tags'] && config.format !== 'next-intl') {
@@ -87699,7 +87711,8 @@ const INPUTS = [
     'ignore-locales',
     'ignore-values',
     'disable-checks',
-    'ignore-tags'
+    'ignore-tags',
+    'keys-as-text'
 ];
 async function run() {
     try {
@@ -87820,7 +87833,8 @@ function analyzeOptions(config) {
         disabledChecks: config['disable-checks'],
         ignoreKeys: config['ignore-keys'],
         ignoreValues: config['ignore-values'],
-        ignoreTags: config['ignore-tags']
+        ignoreTags: config['ignore-tags'],
+        keysAsText: config['keys-as-text']
     };
 }
 // Undefined when there is none, a message when it is broken

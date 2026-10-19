@@ -105,7 +105,8 @@ const settings = z.strictObject({
   'ignore-locales': list.default([]),
   'ignore-values': valueList.default([]),
   'disable-checks': list.pipe(z.array(z.enum(CHECK_IDS))).default([]),
-  'ignore-tags': flag.default(false)
+  'ignore-tags': flag.default(false),
+  'keys-as-text': flag.default(false)
 })
 
 export const configSchema = settings.superRefine((config, ctx) => {

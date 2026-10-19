@@ -31,11 +31,16 @@ export function createContext(
   {
     format,
     ignoreValues = [],
-    ignoreTags = false
-  }: Pick<AnalyzeOptions, 'format' | 'ignoreValues' | 'ignoreTags'>
+    ignoreTags = false,
+    keysAsText = false
+  }: Pick<
+    AnalyzeOptions,
+    'format' | 'ignoreValues' | 'ignoreTags' | 'keysAsText'
+  >
 ): CheckContext | undefined {
-  const base = project.locales.get(project.baseLocale)
-  if (!base) return undefined
+  const loaded = project.locales.get(project.baseLocale)
+  if (!loaded) return undefined
+  const base = keysAsText ? withKeysAsText(loaded) : loaded
   const targets = [...project.locales.values()].filter(
     (locale) => locale.code !== base.code
   )
@@ -48,6 +53,20 @@ export function createContext(
     ignoreValues,
     plurals: format === 'json' ? new SuffixPlurals(base) : undefined
   }
+}
+
+// An empty base value means the key is the text: { "Save": "" }
+function withKeysAsText(locale: Locale): Locale {
+  const entries = new Map<string, Entry>()
+  for (const [key, entry] of locale.entries) {
+    entries.set(
+      key,
+      entry.value.trim() === ''
+        ? { ...entry, value: entry.filePath.at(-1) ?? key }
+        : entry
+    )
+  }
+  return { ...locale, entries }
 }
 
 // The same key, or the base `other` form for a plural form the base lacks

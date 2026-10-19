@@ -236,6 +236,19 @@ describe('empty-values', () => {
     ])
     expect(issues[0]?.baseValue).toBe('A')
   })
+
+  it('reads an empty base value as its key with keys-as-text', async () => {
+    const issues = await run(
+      'empty-values',
+      {
+        'locales/en.json': json({ Save: '', 'Hello {{name}}': '' }),
+        'locales/ar.json': json({ Save: '', 'Hello {{name}}': 'أهلا {{name}}' })
+      },
+      { keysAsText: true }
+    )
+    expect(summarize(issues)).toEqual(['ar Save:2 Empty value for `Save`'])
+    expect(issues[0]?.baseValue).toBe('Save')
+  })
 })
 
 describe('broken Rails files', () => {

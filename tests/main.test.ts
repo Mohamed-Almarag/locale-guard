@@ -208,6 +208,16 @@ describe('run', () => {
     )
   })
 
+  it('reads keys-as-text from the inputs', async () => {
+    setup({ inputs: { 'keys-as-text': 'maybe' } })
+
+    await run()
+
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'Locale Guard settings are not valid:\nInvalid "keys-as-text": expected true or false (got "maybe")'
+    )
+  })
+
   it('fails with a clear message for invalid settings', async () => {
     setup({ inputs: { 'fail-on': 'sometimes' } })
 
