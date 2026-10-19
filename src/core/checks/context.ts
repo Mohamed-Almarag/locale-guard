@@ -1,3 +1,4 @@
+import type { AnalyzeOptions } from '../analyze.js'
 import { type MessageInfo, createDescriber } from '../formats/index.js'
 import type {
   Entry,
@@ -27,8 +28,11 @@ export type Check = (context: CheckContext) => Issue[]
 
 export function createContext(
   project: Project,
-  format: Format,
-  ignoreValues: string[] = []
+  {
+    format,
+    ignoreValues = [],
+    ignoreTags = false
+  }: Pick<AnalyzeOptions, 'format' | 'ignoreValues' | 'ignoreTags'>
 ): CheckContext | undefined {
   const base = project.locales.get(project.baseLocale)
   if (!base) return undefined
@@ -40,7 +44,7 @@ export function createContext(
     format,
     base,
     targets,
-    describe: createDescriber(format),
+    describe: createDescriber(format, { ignoreTags }),
     ignoreValues,
     plurals: format === 'json' ? new SuffixPlurals(base) : undefined
   }

@@ -20,12 +20,18 @@ export async function load(
 export async function run(
   check: CheckId,
   files: Record<string, string>,
-  options: { patterns?: string[]; baseLocale?: string; format?: Format } = {}
+  options: {
+    patterns?: string[]
+    baseLocale?: string
+    format?: Format
+    ignoreTags?: boolean
+  } = {}
 ): Promise<Issue[]> {
   const project = await load(files, options)
-  return analyze(project, { format: options.format ?? 'json' }).filter(
-    (issue) => issue.check === check
-  )
+  return analyze(project, {
+    format: options.format ?? 'json',
+    ignoreTags: options.ignoreTags
+  }).filter((issue) => issue.check === check)
 }
 
 // One line per issue

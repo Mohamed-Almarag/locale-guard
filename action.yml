@@ -76,6 +76,12 @@ inputs:
       invalid-syntax, placeholder-mismatch, broken-linked-messages,
       untranslated, plural-forms, parse-error.
     required: false
+  ignore-tags:
+    description: >
+      ICU only: read tags such as <b> or <a href="..."> as plain text, for
+      projects that format messages with intl-messageformat's ignoreTag option.
+      Default: false.
+    required: false
   config-file:
     description:
       'Optional settings file. Inputs that are set win over it. Default:
