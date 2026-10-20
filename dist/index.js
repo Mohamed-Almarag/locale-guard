@@ -87309,7 +87309,7 @@ function renderReport(input) {
         // Without a summary link, this is the job summary itself
         const rest = input.summaryUrl
             ? `, see the [job summary](${input.summaryUrl})`
-            : ' not shown, because this page reached its size limit. To list every issue, run `npx locale-guard-cli --all --output report.md` on your machine';
+            : ' not shown, because this page reached its size limit. To list every issue, run `npx locale-guard-cli --all --output locale-guard-report.md` on your machine';
         body += `\n…and ${count(omitted, 'more issue', 'more issues')}${rest}.\n`;
     }
     return body;

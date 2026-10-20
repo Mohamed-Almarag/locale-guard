@@ -432,7 +432,7 @@ describe('renderReport', () => {
       maxLength: 5_000
     })
     expect(body).toMatch(
-      /…and \d+ more issues not shown, because this page reached its size limit\. To list every issue, run `npx locale-guard-cli --all --output report\.md` on your machine\.\n$/
+      /…and \d+ more issues not shown, because this page reached its size limit\. To list every issue, run `npx locale-guard-cli --all --output locale-guard-report\.md` on your machine\.\n$/
     )
     expect(body).not.toContain('see the job summary')
     expect(body).toContain('📋 The copy-paste block did not fit on this page.')
