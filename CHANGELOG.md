@@ -4,6 +4,35 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-10-21
+
+### Added
+
+- `locale-guard-cli`, a CLI on npm that runs the same checks on your machine and
+  in git hooks. By default it reports only the issues added since the last
+  commit. `--staged` checks a commit before it is made, `--base` compares with a
+  branch, `--all` lists every issue, and `--output` writes the report as
+  Markdown, the same as the pull request comment. It reads `.localeguard.yml`,
+  and the settings that choose what to check can be given as options too.
+- `ignore-tags` reads ICU tags such as `<b>` as plain text, for projects that
+  format messages with intl-messageformat's `ignoreTag` option.
+- `keys-as-text` reads an empty base value as its key, for projects whose keys
+  are the base text.
+
+### Changed
+
+- Updated `@intlify/message-compiler` to 11.4.16, and the build to rollup
+  4.64.10.
+
+### Fixed
+
+- A comment section longer than the comment limit was left out whole, so a pull
+  request that added a locale to a project with 350 keys or more got a comment
+  with no issue in it. The section now shows the rows that fit, and errors come
+  first.
+- When the job summary reaches its size limit, its last line tells you to run
+  the CLI to list every issue.
+
 ## [1.2.0] - 2026-10-17
 
 ### Added
@@ -138,6 +167,7 @@ First release.
 - `fail-on`, `fail-on-existing`, `ignore-keys`, `ignore-locales`,
   `ignore-values` and `disable-checks`.
 
+[1.3.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.1.0
 [1.0.3]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.0.3

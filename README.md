@@ -6,13 +6,16 @@
 
 A GitHub Action that checks your translation files on every pull request, and
 tells you exactly what is missing or broken in each language before it reaches
-your users.
+your users. The same checks run on your machine and in git hooks with
+[a CLI](#cli-and-git-hooks).
 
 It works with **vue-i18n** (and Nuxt), **ICU** messages (next-intl, react-intl),
 **plain JSON** (i18next, react-i18next) and **Rails** locale files, in JSON or
 YAML.
 
-<img src="docs/images/demo.gif" alt="Demo: the Locale Guard comment and line annotations on a Nuxt pull request, the ICU errors it reports on a Next.js pull request, and the supported libraries" width="800">
+<img src="docs/images/demo-action.gif" alt="Locale Guard on a Nuxt pull request: the comment with six errors and three warnings, then an annotation on the Arabic file" width="800">
+
+<img src="docs/images/demo-cli.gif" alt="locale-guard-cli in a terminal: it lists nine issues in the changed files, saves the same report as locale-guard-report.md, and stops a commit from a Husky pre-commit hook" width="800">
 
 <img src="docs/images/hero.png" alt="Left: a German checkout page showing the raw key checkout.coupon.invalid. Right: the Locale Guard comment on the pull request reporting that key as missing in ar and de, with a copy-paste block" width="800">
 
@@ -68,6 +71,82 @@ jobs:
 `files` says where your locale files are, with `{locale}` where the language
 code goes. `format` names the library that reads your messages. That is all most
 projects need.
+
+## CLI and git hooks
+
+The same checks run on your machine with
+[locale-guard-cli](https://www.npmjs.com/package/locale-guard-cli). It needs
+Node.js 22.13 or later and reads the same settings file. Add `.localeguard.yml`
+next to `package.json`:
+
+```yaml
+files: locales/{locale}.json
+format: vue-i18n
+```
+
+Then run:
+
+```bash
+npx locale-guard-cli
+```
+
+By default it compares your files with the last commit, so it reports only what
+you changed, the way a pull request does. Each issue comes with its file and
+line, and the run fails when an issue is an error.
+
+| Option            | What it does                                                                                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--all`           | List every issue, without comparing                                                                                                                   |
+| `--base <ref>`    | Compare with a branch, tag or commit, such as `main`                                                                                                  |
+| `--staged`        | Check the staged files, as the commit will hold them                                                                                                  |
+| `--output <file>` | Also write the report as Markdown, the same as the pull request comment. No file is written without it, so name one, such as `locale-guard-report.md` |
+
+The settings that choose what to check are options too, such as `--files`,
+`--format` and `--ignore-keys`, and they win over the settings file.
+`npx locale-guard-cli --help` lists them all. The exit code is 0 when the run
+passes, 1 when issues fail it, and 2 when a setting or the command is not valid.
+
+To keep the report out of the repository, add it to `.gitignore`:
+
+```gitignore
+locale-guard-report.md
+```
+
+### Git hooks
+
+Check each commit with `--staged`, so the hook reads the files as the commit
+will hold them, not as they are on disk. Before a push, compare with the branch
+the pull request goes to.
+
+With [Husky](https://typicode.github.io/husky/), add two files:
+
+```bash
+# .husky/pre-commit
+npx locale-guard-cli --staged
+```
+
+```bash
+# .husky/pre-push
+npx locale-guard-cli --base origin/main
+```
+
+With [Lefthook](https://lefthook.dev/), in `lefthook.yml`:
+
+```yaml
+pre-commit:
+  jobs:
+    - name: translations
+      glob: 'locales/*.json'
+      run: npx locale-guard-cli --staged
+
+pre-push:
+  jobs:
+    - name: translations
+      run: npx locale-guard-cli --base origin/main
+```
+
+`glob` runs the pre-commit check only when a locale file is staged. Use the same
+pattern as `files`, with `*` in place of `{locale}`.
 
 ## Checks
 
@@ -156,23 +235,25 @@ A pull request that changes only the base file is checked too.
 
 ## Inputs
 
-| Input              | Default               | Description                                                                                                                                                                                 |
-| ------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `files`            |                       | **Required**, here or in the settings file. Where the locale files are, with `{locale}` in place of the language code. Several patterns can be given, one per line.                         |
-| `format`           | `json`                | The library that reads your messages. See [Formats](#formats).                                                                                                                              |
-| `base-locale`      | `en`                  | The locale every other locale is compared with.                                                                                                                                             |
-| `base-file`        |                       | The base locale's file when its name has no locale code, such as `lang/main.json` next to `lang/main-ar.json`. See [A base file without a locale code](#a-base-file-without-a-locale-code). |
-| `fail-on`          | `error`               | When the check fails: `error`, `warning` or `never`.                                                                                                                                        |
-| `fail-on-existing` | `false`               | Also fail on issues that existed before the pull request.                                                                                                                                   |
-| `check-when`       | `locale-changes`      | `locale-changes` checks only pull requests that change locale files. `always` checks every pull request and lists the existing issues, which fail only with `fail-on-existing: true`.       |
-| `comment`          | `true`                | Write a single pull request comment that is updated on every run.                                                                                                                           |
-| `annotations`      | `true`                | Mark issues on their line in the "Files changed" tab.                                                                                                                                       |
-| `ignore-keys`      |                       | Key patterns to skip, one per line or comma separated, such as `legacy.*`. Namespaces are part of the key: `billing.*` skips `locales/{locale}/billing.json`.                               |
-| `ignore-locales`   |                       | Locales to skip, such as a language that is still being translated.                                                                                                                         |
-| `ignore-values`    |                       | Values that may stay untranslated, such as brand names: `Google`, `OK`. One per line, and a line can contain commas. Matched against the whole value, ignoring case.                        |
-| `disable-checks`   |                       | Checks to turn off, by the names in [Checks](#checks).                                                                                                                                      |
-| `config-file`      | `.localeguard.yml`    | Optional settings file.                                                                                                                                                                     |
-| `github-token`     | `${{ github.token }}` | Token used to read the pull request and write the comment.                                                                                                                                  |
+| Input              | Default               | Description                                                                                                                                                                                      |
+| ------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `files`            |                       | **Required**, here or in the settings file. Where the locale files are, with `{locale}` in place of the language code. Several patterns can be given, one per line.                              |
+| `format`           | `json`                | The library that reads your messages. See [Formats](#formats).                                                                                                                                   |
+| `base-locale`      | `en`                  | The locale every other locale is compared with.                                                                                                                                                  |
+| `base-file`        |                       | The base locale's file when its name has no locale code, such as `lang/main.json` next to `lang/main-ar.json`. See [A base file without a locale code](#a-base-file-without-a-locale-code).      |
+| `fail-on`          | `error`               | When the check fails: `error`, `warning` or `never`.                                                                                                                                             |
+| `fail-on-existing` | `false`               | Also fail on issues that existed before the pull request.                                                                                                                                        |
+| `check-when`       | `locale-changes`      | `locale-changes` checks only pull requests that change locale files. `always` checks every pull request and lists the existing issues, which fail only with `fail-on-existing: true`.            |
+| `comment`          | `true`                | Write a single pull request comment that is updated on every run.                                                                                                                                |
+| `annotations`      | `true`                | Mark issues on their line in the "Files changed" tab.                                                                                                                                            |
+| `ignore-keys`      |                       | Key patterns to skip, one per line or comma separated, such as `legacy.*`. Namespaces are part of the key: `billing.*` skips `locales/{locale}/billing.json`.                                    |
+| `ignore-locales`   |                       | Locales to skip, such as a language that is still being translated.                                                                                                                              |
+| `ignore-values`    |                       | Values that may stay untranslated, such as brand names: `Google`, `OK`. One per line, and a line can contain commas. Matched against the whole value, ignoring case.                             |
+| `disable-checks`   |                       | Checks to turn off, by the names in [Checks](#checks).                                                                                                                                           |
+| `ignore-tags`      | `false`               | ICU only: read tags such as `<b>` or `<a href="...">` as plain text, for projects that format messages with intl-messageformat's `ignoreTag` option. Tags are then not compared between locales. |
+| `keys-as-text`     | `false`               | For projects whose keys are the base text, such as `"Save": ""` in `en.json`: an empty base value is read as its key, so the other locales are compared with it.                                 |
+| `config-file`      | `.localeguard.yml`    | Optional settings file.                                                                                                                                                                          |
+| `github-token`     | `${{ github.token }}` | Token used to read the pull request and write the comment.                                                                                                                                       |
 
 ### Settings file
 
@@ -218,16 +299,48 @@ and no settings file finishes in a few seconds without checking anything.
 
 ### Full report on a schedule
 
-To list every issue in the project outside pull requests, run Locale Guard
-weekly or by hand. It writes the full report to the job summary and fails when
-it finds errors.
+To list every issue in the project outside pull requests, add a second workflow
+next to the first one. Keep `on: pull_request` in the first file, so pull
+requests are still checked.
 
 ```yaml
+# .github/workflows/translations-weekly.yml
+name: Translations report
+
 on:
   schedule:
-    - cron: '0 6 * * 1'
-  workflow_dispatch:
+    - cron: '0 6 * * 1' # every Monday at 06:00 UTC
+  workflow_dispatch: # and a "Run workflow" button in the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  locale-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Mohamed-Almarag/locale-guard@v1
+        with:
+          files: locales/{locale}.json
+          format: vue-i18n
 ```
+
+The five fields of `cron` are the minute, the hour, the day of the month, the
+month and the day of the week, in UTC. Change them to run at another time, and
+check the result on [crontab.guru](https://crontab.guru/).
+
+The report is in the Actions tab: open the run, then scroll down past the job to
+its summary. The run fails when it finds errors, and GitHub notifies the person
+who last edited the schedule. In a public repository, GitHub turns scheduled
+workflows off after 60 days without activity. A demo repository runs
+[this workflow](https://github.com/Mohamed-Almarag/locale-guard-demo-nuxt/blob/main/.github/workflows/translations-weekly.yml),
+and this is its report:
+
+<img src="docs/images/weekly-report.png" alt="The job summary of the weekly run in the Nuxt demo: a missing key in German and an extra key in French" width="700">
+
+On your machine, `npx locale-guard-cli --all --output locale-guard-report.md`
+writes the same full report to a file.
 
 ## Forks and security
 
@@ -258,21 +371,22 @@ log, and still writes the job summary and the annotations.
 
 ## Examples
 
-Each demo is a small app with three open pull requests: one with mistakes on
-purpose, one that is fixed by a second commit, and one that does not touch
-translations.
+Each demo is a small app. Its open pull requests show Locale Guard at work, such
+as a pull request with mistakes on purpose, one fixed by a second commit, and
+one that does not touch translations.
 
-| Stack                             | Repository                                                                                                |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Nuxt with `@nuxtjs/i18n`          | [locale-guard-demo-nuxt](https://github.com/Mohamed-Almarag/locale-guard-demo-nuxt)                       |
-| Vue with YAML files               | [locale-guard-demo-vue-yaml](https://github.com/Mohamed-Almarag/locale-guard-demo-vue-yaml)               |
-| Vue with namespace files          | [locale-guard-demo-vue-namespaces](https://github.com/Mohamed-Almarag/locale-guard-demo-vue-namespaces)   |
-| Next.js with next-intl            | [locale-guard-demo-next](https://github.com/Mohamed-Almarag/locale-guard-demo-next)                       |
-| Next.js with namespace files      | [locale-guard-demo-next-namespaces](https://github.com/Mohamed-Almarag/locale-guard-demo-next-namespaces) |
-| React with react-intl             | [locale-guard-demo-react-intl](https://github.com/Mohamed-Almarag/locale-guard-demo-react-intl)           |
-| React with react-i18next          | [locale-guard-demo-react-i18next](https://github.com/Mohamed-Almarag/locale-guard-demo-react-i18next)     |
-| Rails with YAML files             | [locale-guard-demo-rails](https://github.com/Mohamed-Almarag/locale-guard-demo-rails)                     |
-| A base file without a locale code | [locale-guard-demo-base-file](https://github.com/Mohamed-Almarag/locale-guard-demo-base-file)             |
+| Stack                             | Repository                                                                                                                                                            |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nuxt with `@nuxtjs/i18n`          | [locale-guard-demo-nuxt](https://github.com/Mohamed-Almarag/locale-guard-demo-nuxt)                                                                                   |
+| Vue with YAML files               | [locale-guard-demo-vue-yaml](https://github.com/Mohamed-Almarag/locale-guard-demo-vue-yaml)                                                                           |
+| Vue with namespace files          | [locale-guard-demo-vue-namespaces](https://github.com/Mohamed-Almarag/locale-guard-demo-vue-namespaces)                                                               |
+| Next.js with next-intl            | [locale-guard-demo-next](https://github.com/Mohamed-Almarag/locale-guard-demo-next)                                                                                   |
+| Next.js with namespace files      | [locale-guard-demo-next-namespaces](https://github.com/Mohamed-Almarag/locale-guard-demo-next-namespaces)                                                             |
+| React with react-intl             | [locale-guard-demo-react-intl](https://github.com/Mohamed-Almarag/locale-guard-demo-react-intl)                                                                       |
+| React with react-i18next          | [locale-guard-demo-react-i18next](https://github.com/Mohamed-Almarag/locale-guard-demo-react-i18next)                                                                 |
+| Rails with YAML files             | [locale-guard-demo-rails](https://github.com/Mohamed-Almarag/locale-guard-demo-rails)                                                                                 |
+| A base file without a locale code | [locale-guard-demo-base-file](https://github.com/Mohamed-Almarag/locale-guard-demo-base-file)                                                                         |
+| A weekly full report              | [locale-guard-demo-nuxt](https://github.com/Mohamed-Almarag/locale-guard-demo-nuxt/blob/main/.github/workflows/translations-weekly.yml), in `translations-weekly.yml` |
 
 ICU messages: plurals, a `select` argument and rich text tags.
 
@@ -296,8 +410,10 @@ breaks a message, and values copied from one language's file into another's.
 - GitHub shows at most 10 error and 10 warning annotations per step. Locale
   Guard annotates new errors first and counts the rest in one notice. Every
   issue is in the job summary.
-- A comment can hold about 65,000 characters. A longer report is cut, and the
-  comment links to the job summary for the rest.
+- A comment can hold about 65,000 characters. A longer report shows the rows
+  that fit, errors first, and links to the job summary for the rest. The job
+  summary is cut at about 1,000,000 characters, and its last line tells you to
+  run the CLI to list every issue.
 - vue-i18n plurals (`one | many`) are not checked for missing forms, because
   their number of branches depends on custom rules.
 - Plural forms nested under a key in JSON
