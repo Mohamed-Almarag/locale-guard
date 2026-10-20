@@ -338,10 +338,82 @@ describe('renderReport', () => {
       },
       { maxLength: 30_000 }
     )
+    // Every row fits, the copy-paste block does not
     expect(body.length).toBeLessThanOrEqual(30_000)
-    expect(body).toMatch(
-      /…and \d+ more issues, see the \[job summary\]\(https:\/\/x\/run\)\./
+    expect(body.match(/^\| \[`key\d+`\]/gm)).toHaveLength(400)
+    expect(body).not.toContain('Copy-paste for')
+    expect(body).toContain(
+      '📋 The copy-paste block is in the [job summary](https://x/run).'
     )
+    expect(body).not.toContain('more issues')
+  })
+
+  it('cuts a section that is bigger than the limit to the rows that fit', async () => {
+    const many = Object.fromEntries(
+      Array.from({ length: 400 }, (_, i) => [`key${i}`, `Value number ${i}`])
+    )
+    const body = await report(
+      {
+        'locales/en.json': json(many),
+        'locales/ar.json': json({}),
+        'locales/fr.json': json({})
+      },
+      { maxLength: 10_000 }
+    )
+    const rows = body.match(/^\| \[`key\d+`\]/gm) ?? []
+    expect(body.length).toBeLessThanOrEqual(10_000)
+    expect(body).toContain('### ❌ 2 locales: 400 missing keys')
+    expect(rows.length).toBeGreaterThan(50)
+    expect(rows[0]).toBe('| [`key0`]')
+    expect(body).not.toContain('Copy-paste for')
+    expect(body).toContain('📋 The copy-paste block is in the [job summary]')
+    // Each row stands for its key in both locales
+    expect(body).toContain(
+      `…and ${800 - rows.length * 2} more issues, see the [job summary](https://x/run).`
+    )
+  })
+
+  it('keeps errors first when the limit cuts them', async () => {
+    const many = Object.fromEntries(
+      Array.from({ length: 400 }, (_, i) => [`key${i}`, `Value number ${i}`])
+    )
+    const body = await report(
+      {
+        'locales/en.json': json(many),
+        'locales/ar.json': json({}),
+        'locales/fr.json': json(
+          Object.fromEntries(
+            Array.from({ length: 400 }, (_, i) => [
+              `key${i}`,
+              i ? `Valeur ${i}` : ''
+            ])
+          )
+        )
+      },
+      { maxLength: 10_000 }
+    )
+    const rows = body.match(/^\| \[`key\d+`\]/gm) ?? []
+    expect(body).toContain('### ❌ ar: 400 missing keys')
+    expect(body).not.toContain('⚠️ fr')
+    expect(body).toContain(
+      `…and ${400 - rows.length + 1} more issues, see the [job summary](https://x/run).`
+    )
+  })
+
+  it('cuts existing issues to the rows that fit', async () => {
+    const many = Object.fromEntries(
+      Array.from({ length: 400 }, (_, i) => [`key${i}`, `Value number ${i}`])
+    )
+    const body = await report(
+      { 'locales/en.json': json(many), 'locales/ar.json': json({}) },
+      { maxLength: 10_000, mark: (i) => ({ ...i, isNew: false }) }
+    )
+    const rows = body.match(/^\| \[`key\d+`\]/gm) ?? []
+    expect(body.length).toBeLessThanOrEqual(10_000)
+    expect(body).toContain('#### ❌ ar: 400 missing keys')
+    expect(rows.length).toBeGreaterThan(50)
+    expect(body).toContain('</details>')
+    expect(body).toContain(`…and ${400 - rows.length} more issues`)
   })
 
   it('does not point the job summary at itself when it is cut', async () => {
@@ -363,6 +435,7 @@ describe('renderReport', () => {
       /…and \d+ more issues not shown, because this page reached its size limit\./
     )
     expect(body).not.toContain('see the job summary')
+    expect(body).toContain('📋 The copy-paste block did not fit on this page.')
   })
 
   it('lists the keys of a grouped issue in a collapsed block', async () => {
