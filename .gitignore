@@ -100,3 +100,7 @@ __tests__/runner/*
 # IDE files
 .idea
 *.code-workspace
+
+# npm package of the CLI, built when it is published
+cli/dist
+cli/LICENSE
