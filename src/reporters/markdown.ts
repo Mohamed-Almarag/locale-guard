@@ -17,6 +17,13 @@ export interface ReportInput {
   summaryUrl?: string
   // list: collapsed, open: listed open, counts: one row per locale and check
   existing?: 'list' | 'open' | 'counts'
+  // What new issues are new against, when it is not a pull request
+  compared?: { label: string; clean: string }
+}
+
+const PULL_REQUEST = {
+  label: 'New in this PR',
+  clean: 'This pull request adds no new translation issues.'
 }
 
 const LABELS: Record<CheckId, [singular: string, plural: string]> = {
@@ -42,10 +49,11 @@ export function renderReport(input: ReportInput): string {
   const existing = input.issues.filter((issue) => !issue.isNew)
   const limit = (input.maxLength ?? Infinity) - RESERVED
 
-  let body = `${MARKER}\n${title(fresh, existing)}\n`
+  const compared = input.compared ?? PULL_REQUEST
+  let body = `${MARKER}\n${title(fresh, existing, compared.clean)}\n`
   if (input.hasBaseline && input.issues.length > 0) {
     const where = input.existing === 'open' ? 'listed below' : 'collapsed below'
-    body += `\nNew in this PR: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ` (${where})` : ''}\n`
+    body += `\n${compared.label}: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ` (${where})` : ''}\n`
   }
 
   let omitted = 0
@@ -92,12 +100,12 @@ function existingCounts(existing: Issue[], summaryUrl?: string): string {
   return `<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n\n${table}\nEvery issue is listed in the ${where}.\n</details>\n`
 }
 
-function title(fresh: Issue[], existing: Issue[]): string {
+function title(fresh: Issue[], existing: Issue[], clean: string): string {
   if (fresh.length === 0 && existing.length === 0) {
     return '## 🌐 Locale Guard\n\n✅ All translations are in sync.'
   }
   if (fresh.length === 0) {
-    return '## 🌐 Locale Guard\n\n✅ This pull request adds no new translation issues.'
+    return `## 🌐 Locale Guard\n\n✅ ${clean}`
   }
   const errors = fresh.filter((issue) => issue.severity === 'error').length
   const warnings = fresh.length - errors

@@ -1,22 +1,16 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { type AnalyzeOptions, analyze } from './core/analyze.js'
+import { analyze } from './core/analyze.js'
 import { markNew } from './core/baseline.js'
-import {
-  CONFIG_FILE,
-  type Config,
-  type ConfigFile,
-  parseConfig,
-  readConfigFile
-} from './core/config.js'
-import {
-  type LoadOptions,
-  loadProject,
-  localFileSource
-} from './core/loaders/index.js'
+import { CONFIG_FILE, type Config, parseConfig } from './core/config.js'
+import { loadProject, localFileSource } from './core/loaders/index.js'
 import { decide } from './core/policy.js'
+import {
+  SETTINGS,
+  analyzeOptions,
+  loadConfigFile,
+  loadOptions
+} from './core/settings.js'
 import type { Issue } from './core/types.js'
 import { annotate } from './github/annotations.js'
 import { findComment, upsertComment } from './github/comment.js'
@@ -37,36 +31,19 @@ import { SUMMARY_LIMIT, writeSummary } from './reporters/summary.js'
 // GitHub rejects comments over 65,536 characters
 const COMMENT_LIMIT = 65_000
 
-const INPUTS = [
-  'format',
-  'base-locale',
-  'base-file',
-  'files',
-  'fail-on',
-  'fail-on-existing',
-  'check-when',
-  'comment',
-  'annotations',
-  'ignore-keys',
-  'ignore-locales',
-  'ignore-values',
-  'disable-checks',
-  'ignore-tags',
-  'keys-as-text'
-] as const
-
 export async function run(): Promise<void> {
   try {
     const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd()
     const configPath = core.getInput('config-file') || CONFIG_FILE
     const file = await loadConfigFile(workspace, configPath)
+    if (file !== undefined) core.info(`Using settings from ${configPath}`)
     if (typeof file === 'string') {
       core.setFailed(file)
       return
     }
 
     const parsed = parseConfig(
-      Object.fromEntries(INPUTS.map((name) => [name, core.getInput(name)])),
+      Object.fromEntries(SETTINGS.map((name) => [name, core.getInput(name)])),
       file
     )
     if (!parsed.ok) {
@@ -210,41 +187,6 @@ async function analyzeBase(
     )
     return undefined
   }
-}
-
-function loadOptions(config: Config): LoadOptions {
-  return {
-    patterns: config.files,
-    baseLocale: config['base-locale'],
-    baseFile: config['base-file'],
-    ignoreLocales: config['ignore-locales']
-  }
-}
-
-function analyzeOptions(config: Config): AnalyzeOptions {
-  return {
-    format: config.format,
-    disabledChecks: config['disable-checks'],
-    ignoreKeys: config['ignore-keys'],
-    ignoreValues: config['ignore-values'],
-    ignoreTags: config['ignore-tags'],
-    keysAsText: config['keys-as-text']
-  }
-}
-
-// Undefined when there is none, a message when it is broken
-async function loadConfigFile(
-  workspace: string,
-  path: string
-): Promise<ConfigFile | string | undefined> {
-  let text: string
-  try {
-    text = await readFile(join(workspace, path), 'utf8')
-  } catch {
-    return undefined
-  }
-  core.info(`Using settings from ${path}`)
-  return readConfigFile(path, text)
 }
 
 async function skipPullRequest(
