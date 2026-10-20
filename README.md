@@ -371,8 +371,8 @@ log, and still writes the job summary and the annotations.
 
 ## Examples
 
-Each demo is a small app whose first three pull requests show Locale Guard at
-work: one with mistakes on purpose, one that is fixed by a second commit, and
+Each demo is a small app. Its open pull requests show Locale Guard at work, such
+as a pull request with mistakes on purpose, one fixed by a second commit, and
 one that does not touch translations.
 
 | Stack                             | Repository                                                                                                                                                            |
