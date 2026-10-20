@@ -87174,6 +87174,54 @@ function decide(issues, options) {
     return { failed: blocking.length > 0, blocking };
 }
 
+// Set by the Action inputs or the CLI options, over the config file
+const SETTINGS = [
+    'format',
+    'base-locale',
+    'base-file',
+    'files',
+    'fail-on',
+    'fail-on-existing',
+    'check-when',
+    'comment',
+    'annotations',
+    'ignore-keys',
+    'ignore-locales',
+    'ignore-values',
+    'disable-checks',
+    'ignore-tags',
+    'keys-as-text'
+];
+function loadOptions(config) {
+    return {
+        patterns: config.files,
+        baseLocale: config['base-locale'],
+        baseFile: config['base-file'],
+        ignoreLocales: config['ignore-locales']
+    };
+}
+function analyzeOptions(config) {
+    return {
+        format: config.format,
+        disabledChecks: config['disable-checks'],
+        ignoreKeys: config['ignore-keys'],
+        ignoreValues: config['ignore-values'],
+        ignoreTags: config['ignore-tags'],
+        keysAsText: config['keys-as-text']
+    };
+}
+// Undefined when there is none, a message when it is broken
+async function loadConfigFile(root, path) {
+    let text;
+    try {
+        text = await readFile(join(root, path), 'utf8');
+    }
+    catch {
+        return undefined;
+    }
+    return readConfigFile(path, text);
+}
+
 // GitHub shows 10 per severity per step, so new issues go first
 const ANNOTATIONS_PER_SEVERITY = 10;
 function annotate(issues, baseLocale, sink = core) {
@@ -87214,6 +87262,10 @@ function properties(issue) {
 }
 
 const MARKER = '<!-- locale-guard -->';
+const PULL_REQUEST = {
+    label: 'New in this PR',
+    clean: 'This pull request adds no new translation issues.'
+};
 const LABELS = {
     'parse-error': ['file could not be parsed', 'files could not be parsed'],
     'missing-keys': ['missing key', 'missing keys'],
@@ -87232,10 +87284,11 @@ function renderReport(input) {
     const fresh = input.issues.filter((issue) => issue.isNew);
     const existing = input.issues.filter((issue) => !issue.isNew);
     const limit = (input.maxLength ?? Infinity) - RESERVED;
-    let body = `${MARKER}\n${title(fresh, existing)}\n`;
+    const compared = input.compared ?? PULL_REQUEST;
+    let body = `${MARKER}\n${title(fresh, existing, compared.clean)}\n`;
     if (input.hasBaseline && input.issues.length > 0) {
         const where = input.existing === 'open' ? 'listed below' : 'collapsed below';
-        body += `\nNew in this PR: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ` (${where})` : ''}\n`;
+        body += `\n${compared.label}: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ` (${where})` : ''}\n`;
     }
     let omitted = 0;
     for (const group of mergeMissingKeys(groupIssues(fresh))) {
@@ -87282,12 +87335,12 @@ function existingCounts(existing, summaryUrl) {
         : 'job summary of this run';
     return `<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n\n${table}\nEvery issue is listed in the ${where}.\n</details>\n`;
 }
-function title(fresh, existing) {
+function title(fresh, existing, clean) {
     if (fresh.length === 0 && existing.length === 0) {
         return '## 🌐 Locale Guard\n\n✅ All translations are in sync.';
     }
     if (fresh.length === 0) {
-        return '## 🌐 Locale Guard\n\n✅ This pull request adds no new translation issues.';
+        return `## 🌐 Locale Guard\n\n✅ ${clean}`;
     }
     const errors = fresh.filter((issue) => issue.severity === 'error').length;
     const warnings = fresh.length - errors;
@@ -87706,33 +87759,18 @@ async function writeSummary(markdown, summary$1 = summary) {
 
 // GitHub rejects comments over 65,536 characters
 const COMMENT_LIMIT = 65_000;
-const INPUTS = [
-    'format',
-    'base-locale',
-    'base-file',
-    'files',
-    'fail-on',
-    'fail-on-existing',
-    'check-when',
-    'comment',
-    'annotations',
-    'ignore-keys',
-    'ignore-locales',
-    'ignore-values',
-    'disable-checks',
-    'ignore-tags',
-    'keys-as-text'
-];
 async function run() {
     try {
         const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
         const configPath = getInput('config-file') || CONFIG_FILE;
         const file = await loadConfigFile(workspace, configPath);
+        if (file !== undefined)
+            info(`Using settings from ${configPath}`);
         if (typeof file === 'string') {
             setFailed(file);
             return;
         }
-        const parsed = parseConfig(Object.fromEntries(INPUTS.map((name) => [name, getInput(name)])), file);
+        const parsed = parseConfig(Object.fromEntries(SETTINGS.map((name) => [name, getInput(name)])), file);
         if (!parsed.ok) {
             setFailed(['Locale Guard settings are not valid:', ...parsed.errors].join('\n'));
             return;
@@ -87827,36 +87865,6 @@ async function analyzeBase(octokit, context, config) {
         warning(`Could not read the locale files of the base branch, so every issue is treated as new. ${error instanceof Error ? error.message : ''}`);
         return undefined;
     }
-}
-function loadOptions(config) {
-    return {
-        patterns: config.files,
-        baseLocale: config['base-locale'],
-        baseFile: config['base-file'],
-        ignoreLocales: config['ignore-locales']
-    };
-}
-function analyzeOptions(config) {
-    return {
-        format: config.format,
-        disabledChecks: config['disable-checks'],
-        ignoreKeys: config['ignore-keys'],
-        ignoreValues: config['ignore-values'],
-        ignoreTags: config['ignore-tags'],
-        keysAsText: config['keys-as-text']
-    };
-}
-// Undefined when there is none, a message when it is broken
-async function loadConfigFile(workspace, path) {
-    let text;
-    try {
-        text = await readFile(join(workspace, path), 'utf8');
-    }
-    catch {
-        return undefined;
-    }
-    info(`Using settings from ${path}`);
-    return readConfigFile(path, text);
 }
 async function skipPullRequest(octokit, context, config, configPath) {
     const pr = context.pullRequest;
