@@ -69846,11 +69846,16 @@ function finalize$1(info) {
     };
 }
 
-function describeIcuMessage(source) {
+// Markup in the text when tags are read as text, as intl-messageformat's ignoreTag does
+const MARKUP = /<\/?[^<>]*>/g;
+function describeIcuMessage(source, { ignoreTags = false } = {}) {
     let elements;
     try {
         // plural-forms reports a missing `other` with a clearer message
-        elements = parse$4(source, { requiresOtherClause: false });
+        elements = parse$4(source, {
+            requiresOtherClause: false,
+            ignoreTag: ignoreTags
+        });
     }
     catch (error) {
         const location = error
@@ -69906,13 +69911,16 @@ function describeIcuMessage(source) {
         }
     };
     walk(elements);
+    const clean = (value) => (ignoreTags ? value.replace(MARKUP, ' ') : value)
+        .replace(/\s+/g, ' ')
+        .trim();
     return finalize$1({
         placeholders,
         linkedKeys: [],
         plurals,
-        text: text.replace(/\s+/g, ' ').trim(),
+        text: clean(text),
         longestText: hasBranches(elements)
-            ? longestRendering(elements).replace(/\s+/g, ' ').trim()
+            ? clean(longestRendering(elements))
             : undefined
     });
 }
@@ -69961,7 +69969,7 @@ function describePlainMessage(source) {
 }
 
 /*!
-  * shared v11.4.14
+  * shared v11.4.16
   * (c) 2026 kazuya kawaguchi
   * Released under the MIT License.
   */
@@ -69988,7 +69996,7 @@ const assign = Object.assign;
 const isObject$1 = (val) => val !== null && typeof val === 'object';
 
 /*!
-  * message-compiler v11.4.14
+  * message-compiler v11.4.16
   * (c) 2026 kazuya kawaguchi
   * Released under the MIT License.
   */
@@ -71205,13 +71213,13 @@ const describers = {
     json: describePlainMessage
 };
 // Parses each distinct message once
-function createDescriber(format) {
+function createDescriber(format, options = {}) {
     const describe = describers[format];
     const cache = new Map();
     return (source) => {
         let info = cache.get(source);
         if (!info) {
-            info = describe(source);
+            info = describe(source, options);
             cache.set(source, info);
         }
         return info;
@@ -71395,20 +71403,39 @@ function groupId(plural) {
     return `${plural.stem}|${plural.separator}|${plural.ordinal}`;
 }
 
-function createContext(project, format, ignoreValues = []) {
-    const base = project.locales.get(project.baseLocale);
-    if (!base)
+function createContext(project, { format, ignoreValues = [], ignoreTags = false, keysAsText = false }) {
+    const loaded = project.locales.get(project.baseLocale);
+    if (!loaded)
         return undefined;
+    const plurals = format === 'json' ? new SuffixPlurals(loaded) : undefined;
+    const base = keysAsText ? withKeysAsText(loaded, plurals) : loaded;
     const targets = [...project.locales.values()].filter((locale) => locale.code !== base.code);
     return {
         project,
         format,
         base,
         targets,
-        describe: createDescriber(format),
+        describe: createDescriber(format, { ignoreTags }),
         ignoreValues,
-        plurals: format === 'json' ? new SuffixPlurals(base) : undefined
+        keysAsText,
+        plurals
     };
+}
+// An empty base value means the key is the text: { "Save": "" }
+function withKeysAsText(locale, plurals) {
+    const entries = new Map();
+    for (const [key, entry] of locale.entries) {
+        if (entry.value.trim() !== '') {
+            entries.set(key, entry);
+            continue;
+        }
+        const text = entry.filePath.at(-1) ?? key;
+        // i18next shows `{{count}} files` for an empty `{{count}} files_one`
+        const plural = plurals?.of(key);
+        const suffix = plural ? key.length - plural.stem.length : 0;
+        entries.set(key, { ...entry, value: text.slice(0, text.length - suffix) });
+    }
+    return { ...locale, entries };
 }
 // The same key, or the base `other` form for a plural form the base lacks
 function baseEntryFor({ base, plurals }, key) {
@@ -71884,7 +71911,7 @@ const untranslated = (context) => [
     ...sharedValues(context)
 ];
 const perValue = (context) => {
-    const { base, targets, describe, ignoreValues } = context;
+    const { base, targets, describe, ignoreValues, keysAsText } = context;
     const ignored = ignoredSet(ignoreValues);
     const baseLanguage = languageOf(base.code);
     const issues = [];
@@ -71904,9 +71931,10 @@ const perValue = (context) => {
             // Plurals count one branch: `ticket | tickets` is one word
             const shown = withoutCode(describe(entry.value).longestText ?? text);
             let message;
-            if (language !== baseLanguage &&
-                value === baseEntry.value.trim() &&
-                wordCount(shown) >= 2) {
+            // With keys-as-text, a copied plural key keeps its suffix: `{{count}} files_one`
+            const copied = value === baseEntry.value.trim() ||
+                (keysAsText && value === entry.filePath.at(-1));
+            if (language !== baseLanguage && copied && wordCount(shown) >= 2) {
                 message = `${showKey(key)}: same text as ${base.code}`;
             }
             else if (script && !script.letters.test(text)) {
@@ -72009,7 +72037,7 @@ const checks = {
 function analyze(project, options) {
     const disabled = new Set(options.disabledChecks ?? []);
     const issues = disabled.has('parse-error') ? [] : [...project.parseErrors];
-    const context = createContext(project, options.format, options.ignoreValues);
+    const context = createContext(project, options);
     if (context) {
         for (const [id, check] of Object.entries(checks)) {
             if (disabled.has(id))
@@ -84915,7 +84943,7 @@ const valueList = union([array(string()), string()])
     return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
 });
 const flag = union([boolean(), stringbool()]);
-const configSchema = strictObject({
+const settings = strictObject({
     format: string()
         .trim()
         .toLowerCase()
@@ -84947,7 +84975,18 @@ const configSchema = strictObject({
     'ignore-keys': list.default([]),
     'ignore-locales': list.default([]),
     'ignore-values': valueList.default([]),
-    'disable-checks': list.pipe(array(_enum(CHECK_IDS))).default([])
+    'disable-checks': list.pipe(array(_enum(CHECK_IDS))).default([]),
+    'ignore-tags': flag.default(false),
+    'keys-as-text': flag.default(false)
+});
+const configSchema = settings.superRefine((config, ctx) => {
+    if (config['ignore-tags'] && config.format !== 'next-intl') {
+        ctx.addIssue({
+            code: 'custom',
+            path: ['ignore-tags'],
+            message: 'works only with ICU messages: format icu, next-intl, use-intl, react-intl or formatjs'
+        });
+    }
 });
 // An input that was set wins over the config file
 function parseConfig(inputs, file) {
@@ -87135,6 +87174,54 @@ function decide(issues, options) {
     return { failed: blocking.length > 0, blocking };
 }
 
+// Set by the Action inputs or the CLI options, over the config file
+const SETTINGS = [
+    'format',
+    'base-locale',
+    'base-file',
+    'files',
+    'fail-on',
+    'fail-on-existing',
+    'check-when',
+    'comment',
+    'annotations',
+    'ignore-keys',
+    'ignore-locales',
+    'ignore-values',
+    'disable-checks',
+    'ignore-tags',
+    'keys-as-text'
+];
+function loadOptions(config) {
+    return {
+        patterns: config.files,
+        baseLocale: config['base-locale'],
+        baseFile: config['base-file'],
+        ignoreLocales: config['ignore-locales']
+    };
+}
+function analyzeOptions(config) {
+    return {
+        format: config.format,
+        disabledChecks: config['disable-checks'],
+        ignoreKeys: config['ignore-keys'],
+        ignoreValues: config['ignore-values'],
+        ignoreTags: config['ignore-tags'],
+        keysAsText: config['keys-as-text']
+    };
+}
+// Undefined when there is none, a message when it is broken
+async function loadConfigFile(root, path) {
+    let text;
+    try {
+        text = await readFile(join(root, path), 'utf8');
+    }
+    catch {
+        return undefined;
+    }
+    return readConfigFile(path, text);
+}
+
 // GitHub shows 10 per severity per step, so new issues go first
 const ANNOTATIONS_PER_SEVERITY = 10;
 function annotate(issues, baseLocale, sink = core) {
@@ -87175,6 +87262,10 @@ function properties(issue) {
 }
 
 const MARKER = '<!-- locale-guard -->';
+const PULL_REQUEST = {
+    label: 'New in this PR',
+    clean: 'This pull request adds no new translation issues.'
+};
 const LABELS = {
     'parse-error': ['file could not be parsed', 'files could not be parsed'],
     'missing-keys': ['missing key', 'missing keys'],
@@ -87193,43 +87284,73 @@ function renderReport(input) {
     const fresh = input.issues.filter((issue) => issue.isNew);
     const existing = input.issues.filter((issue) => !issue.isNew);
     const limit = (input.maxLength ?? Infinity) - RESERVED;
-    let body = `${MARKER}\n${title(fresh, existing)}\n`;
+    const compared = input.compared ?? PULL_REQUEST;
+    let body = `${MARKER}\n${title(fresh, existing, compared.clean)}\n`;
     if (input.hasBaseline && input.issues.length > 0) {
         const where = input.existing === 'open' ? 'listed below' : 'collapsed below';
-        body += `\nNew in this PR: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ` (${where})` : ''}\n`;
+        body += `\n${compared.label}: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ` (${where})` : ''}\n`;
     }
-    let omitted = 0;
-    for (const group of mergeMissingKeys(groupIssues(fresh))) {
-        const section = `\n${renderGroup(group, input, '###')}`;
-        if (body.length + section.length > limit)
-            omitted += group.issues.length;
-        else
-            body += section;
-    }
+    const groups = mergeMissingKeys(groupIssues(fresh));
+    const listed = fill(groups, input, '###', limit - body.length);
+    body += listed.text;
+    let omitted = listed.omitted;
     if (existing.length > 0 && input.existing === 'counts') {
         body += `\n${existingCounts(existing, input.summaryUrl)}`;
     }
     else if (existing.length > 0) {
         const open = input.existing === 'open' ? ' open' : '';
-        let details = `\n<details${open}><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`;
-        for (const group of groupIssues(existing)) {
-            const section = `\n${renderGroup(group, input, '####')}`;
-            if (body.length + details.length + section.length > limit) {
-                omitted += group.issues.length;
-            }
-            else
-                details += section;
-        }
-        body += `${details}\n</details>\n`;
+        const details = `\n<details${open}><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`;
+        const room = listed.omitted ? 0 : limit - body.length - details.length;
+        const old = fill(groupIssues(existing), input, '####', room);
+        body += `${details}${old.text}\n</details>\n`;
+        omitted += old.omitted;
     }
     if (omitted > 0) {
         // Without a summary link, this is the job summary itself
         const rest = input.summaryUrl
             ? `, see the [job summary](${input.summaryUrl})`
-            : ' not shown, because this page reached its size limit';
+            : ' not shown, because this page reached its size limit. To list every issue, run `npx locale-guard-cli --all --output locale-guard-report.md` on your machine';
         body += `\n…and ${count(omitted, 'more issue', 'more issues')}${rest}.\n`;
     }
     return body;
+}
+// In order, so errors come first. The first section that does not fit shows the
+// rows that do, without its copy-paste block, and the rest is left out
+function fill(groups, input, heading, room) {
+    let text = '';
+    let omitted = 0;
+    let full = false;
+    for (const group of groups) {
+        if (full) {
+            omitted += group.issues.length;
+            continue;
+        }
+        const section = renderGroup(group, input, heading);
+        const whole = `\n${section.head}${section.rows.map((row) => row.text).join('')}${section.tail}`;
+        if (text.length + whole.length <= room) {
+            text += whole;
+            continue;
+        }
+        full = true;
+        const note = section.tail ? copyPasteNote(input.summaryUrl) : '';
+        let part = `\n${section.head}`;
+        let shown = 0;
+        for (const row of section.rows) {
+            if (text.length + part.length + row.text.length + note.length > room)
+                break;
+            part += row.text;
+            shown += row.issues;
+        }
+        if (shown > 0)
+            text += part + note;
+        omitted += group.issues.length - shown;
+    }
+    return { text, omitted };
+}
+function copyPasteNote(summaryUrl) {
+    return summaryUrl
+        ? `\n📋 The copy-paste block is in the [job summary](${summaryUrl}).\n`
+        : '\n📋 The copy-paste block did not fit on this page.\n';
 }
 function existingCounts(existing, summaryUrl) {
     let table = '| Locale | Issue | Count |\n|---|---|---|\n';
@@ -87243,12 +87364,12 @@ function existingCounts(existing, summaryUrl) {
         : 'job summary of this run';
     return `<details><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n\n${table}\nEvery issue is listed in the ${where}.\n</details>\n`;
 }
-function title(fresh, existing) {
+function title(fresh, existing, clean) {
     if (fresh.length === 0 && existing.length === 0) {
         return '## 🌐 Locale Guard\n\n✅ All translations are in sync.';
     }
     if (fresh.length === 0) {
-        return '## 🌐 Locale Guard\n\n✅ This pull request adds no new translation issues.';
+        return `## 🌐 Locale Guard\n\n✅ ${clean}`;
     }
     const errors = fresh.filter((issue) => issue.severity === 'error').length;
     const warnings = fresh.length - errors;
@@ -87312,49 +87433,56 @@ function renderGroup(group, input, heading) {
         return renderSharedMissingKeys(group, input, heading);
     const icon = group.severity === 'error' ? '❌' : '⚠️';
     const [singular, plural] = LABELS[group.check];
-    let out = `${heading} ${icon} ${group.locale}: ${count(group.issues.length, singular, plural)}\n\n`;
+    let head = `${heading} ${icon} ${group.locale}: ${count(group.issues.length, singular, plural)}\n\n`;
     if (group.check === 'missing-keys') {
-        out += `| Key | ${input.project.baseLocale} |\n|---|---|\n`;
-        for (const issue of group.issues) {
-            out += `| ${missingKeyLink(issue, input)} | ${cell(issue.baseValue ?? '')} |\n`;
-        }
-        out += copyPaste(group.issues, input.project);
+        head += `| Key | ${input.project.baseLocale} |\n|---|---|\n`;
+        return {
+            head,
+            rows: group.issues.map((issue) => ({
+                text: `| ${missingKeyLink(issue, input)} | ${cell(issue.baseValue ?? '')} |\n`,
+                issues: 1
+            })),
+            tail: copyPaste(group.issues, input.project)
+        };
     }
-    else {
-        for (const issue of group.issues) {
-            const where = location(issue, input);
-            const hint = issue.hint ? `. ${issue.hint}` : '';
-            out += `- ${issue.message}${hint}${where ? ` · ${where}` : ''}\n`;
-            if (issue.details?.length) {
-                const lines = issue.details.map((line) => `  - ${cell(line)}`);
-                out += `  <details><summary>${count(issue.details.length, 'key', 'keys')}</summary>\n\n${lines.join('\n')}\n\n  </details>\n`;
-            }
+    const rows = group.issues.map((issue) => {
+        const where = location(issue, input);
+        const hint = issue.hint ? `. ${issue.hint}` : '';
+        let text = `- ${issue.message}${hint}${where ? ` · ${where}` : ''}\n`;
+        if (issue.details?.length) {
+            const lines = issue.details.map((line) => `  - ${cell(line)}`);
+            text += `  <details><summary>${count(issue.details.length, 'key', 'keys')}</summary>\n\n${lines.join('\n')}\n\n  </details>\n`;
         }
-    }
-    return out;
+        return { text, issues: 1 };
+    });
+    return { head, rows, tail: '' };
 }
-// Links point to the base file
+// Links point to the base file. A row stands for its key in every locale
 function renderSharedMissingKeys(group, input, heading) {
     const { project } = input;
     const base = project.locales.get(project.baseLocale);
     const first = group.issues.filter((issue) => issue.locale === group.locale);
     const locales = group.locales.map((code) => `\`${code}\``).join(', ');
-    let out = `${heading} ❌ ${group.locales.length} locales: ${count(first.length, 'missing key', 'missing keys')}\n\n`;
-    out += `Missing in ${locales}.\n\n`;
-    out += `| Key | ${project.baseLocale} |\n|---|---|\n`;
-    for (const issue of first) {
+    let head = `${heading} ❌ ${group.locales.length} locales: ${count(first.length, 'missing key', 'missing keys')}\n\n`;
+    head += `Missing in ${locales}.\n\n`;
+    head += `| Key | ${project.baseLocale} |\n|---|---|\n`;
+    const rows = first.map((issue) => {
         const entry = base?.entries.get(issue.key);
         const url = entry ? input.link?.(entry.file, entry.line) : undefined;
         const key = showKey(issue.key);
-        out += `| ${url ? `[${key}](${url})` : key} | ${cell(issue.baseValue ?? '')} |\n`;
-    }
+        return {
+            text: `| ${url ? `[${key}](${url})` : key} | ${cell(issue.baseValue ?? '')} |\n`,
+            issues: group.locales.length
+        };
+    });
+    let tail = '';
     for (const [file, fileIssues] of byFile(first)) {
         const under = rootKey(project, group.locale, file)
             ? ', under each locale key'
             : '';
-        out += copyPasteBlock(`Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale${under})`, file, fileIssues, project, false);
+        tail += copyPasteBlock(`Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale${under})`, file, fileIssues, project, false);
     }
-    return out;
+    return { head, rows, tail };
 }
 // `locales/ar/common.json` -> `locales/{locale}/common.json`, `main-ar.json` -> `main-{locale}.json`
 function withLocalePlaceholder(path, locale) {
@@ -87667,31 +87795,18 @@ async function writeSummary(markdown, summary$1 = summary) {
 
 // GitHub rejects comments over 65,536 characters
 const COMMENT_LIMIT = 65_000;
-const INPUTS = [
-    'format',
-    'base-locale',
-    'base-file',
-    'files',
-    'fail-on',
-    'fail-on-existing',
-    'check-when',
-    'comment',
-    'annotations',
-    'ignore-keys',
-    'ignore-locales',
-    'ignore-values',
-    'disable-checks'
-];
 async function run() {
     try {
         const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
         const configPath = getInput('config-file') || CONFIG_FILE;
         const file = await loadConfigFile(workspace, configPath);
+        if (file !== undefined)
+            info(`Using settings from ${configPath}`);
         if (typeof file === 'string') {
             setFailed(file);
             return;
         }
-        const parsed = parseConfig(Object.fromEntries(INPUTS.map((name) => [name, getInput(name)])), file);
+        const parsed = parseConfig(Object.fromEntries(SETTINGS.map((name) => [name, getInput(name)])), file);
         if (!parsed.ok) {
             setFailed(['Locale Guard settings are not valid:', ...parsed.errors].join('\n'));
             return;
@@ -87786,34 +87901,6 @@ async function analyzeBase(octokit, context, config) {
         warning(`Could not read the locale files of the base branch, so every issue is treated as new. ${error instanceof Error ? error.message : ''}`);
         return undefined;
     }
-}
-function loadOptions(config) {
-    return {
-        patterns: config.files,
-        baseLocale: config['base-locale'],
-        baseFile: config['base-file'],
-        ignoreLocales: config['ignore-locales']
-    };
-}
-function analyzeOptions(config) {
-    return {
-        format: config.format,
-        disabledChecks: config['disable-checks'],
-        ignoreKeys: config['ignore-keys'],
-        ignoreValues: config['ignore-values']
-    };
-}
-// Undefined when there is none, a message when it is broken
-async function loadConfigFile(workspace, path) {
-    let text;
-    try {
-        text = await readFile(join(workspace, path), 'utf8');
-    }
-    catch {
-        return undefined;
-    }
-    info(`Using settings from ${path}`);
-    return readConfigFile(path, text);
 }
 async function skipPullRequest(octokit, context, config, configPath) {
     const pr = context.pullRequest;

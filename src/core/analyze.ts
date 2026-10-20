@@ -10,6 +10,10 @@ export interface AnalyzeOptions {
   // Globs, e.g. `legacy.*`
   ignoreKeys?: string[]
   ignoreValues?: string[]
+  // ICU only: tags are plain text
+  ignoreTags?: boolean
+  // An empty base value means the key is the text
+  keysAsText?: boolean
 }
 
 // Pure: never touches files or GitHub
@@ -17,7 +21,7 @@ export function analyze(project: Project, options: AnalyzeOptions): Issue[] {
   const disabled = new Set(options.disabledChecks ?? [])
   const issues = disabled.has('parse-error') ? [] : [...project.parseErrors]
 
-  const context = createContext(project, options.format, options.ignoreValues)
+  const context = createContext(project, options)
   if (context) {
     for (const [id, check] of Object.entries(checks)) {
       if (disabled.has(id as CheckId)) continue

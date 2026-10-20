@@ -1,0 +1,63 @@
+{
+  "name": "locale-guard-cli",
+  "version": "1.3.0",
+  "description": "Check translation files for missing keys, broken placeholders and untranslated text",
+  "type": "module",
+  "bin": {
+    "locale-guard-cli": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "license": "MIT",
+  "author": "Mohamed Almearag",
+  "homepage": "https://github.com/Mohamed-Almarag/locale-guard",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mohamed-Almarag/locale-guard.git",
+    "directory": "cli"
+  },
+  "bugs": {
+    "url": "https://github.com/Mohamed-Almarag/locale-guard/issues"
+  },
+  "keywords": [
+    "i18n",
+    "l10n",
+    "localization",
+    "translation",
+    "translations",
+    "missing-translations",
+    "intl",
+    "messageformat",
+    "vue-i18n",
+    "next-intl",
+    "use-intl",
+    "react-intl",
+    "formatjs",
+    "icu",
+    "i18next",
+    "react-i18next",
+    "next-i18next",
+    "i18next-vue",
+    "rails",
+    "vue",
+    "nuxt",
+    "react",
+    "next",
+    "nextjs",
+    "lint",
+    "linter",
+    "cli",
+    "husky",
+    "lefthook",
+    "pre-commit",
+    "git-hooks",
+    "ci"
+  ],
+  "scripts": {
+    "prepack": "npm --prefix .. run package && node -e \"require('fs').copyFileSync('../LICENSE','LICENSE')\""
+  }
+}
