@@ -87290,38 +87290,67 @@ function renderReport(input) {
         const where = input.existing === 'open' ? 'listed below' : 'collapsed below';
         body += `\n${compared.label}: ${fresh.length} · Already existing: ${existing.length}${existing.length ? ` (${where})` : ''}\n`;
     }
-    let omitted = 0;
-    for (const group of mergeMissingKeys(groupIssues(fresh))) {
-        const section = `\n${renderGroup(group, input, '###')}`;
-        if (body.length + section.length > limit)
-            omitted += group.issues.length;
-        else
-            body += section;
-    }
+    const groups = mergeMissingKeys(groupIssues(fresh));
+    const listed = fill(groups, input, '###', limit - body.length);
+    body += listed.text;
+    let omitted = listed.omitted;
     if (existing.length > 0 && input.existing === 'counts') {
         body += `\n${existingCounts(existing, input.summaryUrl)}`;
     }
     else if (existing.length > 0) {
         const open = input.existing === 'open' ? ' open' : '';
-        let details = `\n<details${open}><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`;
-        for (const group of groupIssues(existing)) {
-            const section = `\n${renderGroup(group, input, '####')}`;
-            if (body.length + details.length + section.length > limit) {
-                omitted += group.issues.length;
-            }
-            else
-                details += section;
-        }
-        body += `${details}\n</details>\n`;
+        const details = `\n<details${open}><summary>${count(existing.length, 'existing issue', 'existing issues')}</summary>\n`;
+        const room = listed.omitted ? 0 : limit - body.length - details.length;
+        const old = fill(groupIssues(existing), input, '####', room);
+        body += `${details}${old.text}\n</details>\n`;
+        omitted += old.omitted;
     }
     if (omitted > 0) {
         // Without a summary link, this is the job summary itself
         const rest = input.summaryUrl
             ? `, see the [job summary](${input.summaryUrl})`
-            : ' not shown, because this page reached its size limit';
+            : ' not shown, because this page reached its size limit. To list every issue, run `npx locale-guard-cli --all --output report.md` on your machine';
         body += `\n…and ${count(omitted, 'more issue', 'more issues')}${rest}.\n`;
     }
     return body;
+}
+// In order, so errors come first. The first section that does not fit shows the
+// rows that do, without its copy-paste block, and the rest is left out
+function fill(groups, input, heading, room) {
+    let text = '';
+    let omitted = 0;
+    let full = false;
+    for (const group of groups) {
+        if (full) {
+            omitted += group.issues.length;
+            continue;
+        }
+        const section = renderGroup(group, input, heading);
+        const whole = `\n${section.head}${section.rows.map((row) => row.text).join('')}${section.tail}`;
+        if (text.length + whole.length <= room) {
+            text += whole;
+            continue;
+        }
+        full = true;
+        const note = section.tail ? copyPasteNote(input.summaryUrl) : '';
+        let part = `\n${section.head}`;
+        let shown = 0;
+        for (const row of section.rows) {
+            if (text.length + part.length + row.text.length + note.length > room)
+                break;
+            part += row.text;
+            shown += row.issues;
+        }
+        if (shown > 0)
+            text += part + note;
+        omitted += group.issues.length - shown;
+    }
+    return { text, omitted };
+}
+function copyPasteNote(summaryUrl) {
+    return summaryUrl
+        ? `\n📋 The copy-paste block is in the [job summary](${summaryUrl}).\n`
+        : '\n📋 The copy-paste block did not fit on this page.\n';
 }
 function existingCounts(existing, summaryUrl) {
     let table = '| Locale | Issue | Count |\n|---|---|---|\n';
@@ -87404,49 +87433,56 @@ function renderGroup(group, input, heading) {
         return renderSharedMissingKeys(group, input, heading);
     const icon = group.severity === 'error' ? '❌' : '⚠️';
     const [singular, plural] = LABELS[group.check];
-    let out = `${heading} ${icon} ${group.locale}: ${count(group.issues.length, singular, plural)}\n\n`;
+    let head = `${heading} ${icon} ${group.locale}: ${count(group.issues.length, singular, plural)}\n\n`;
     if (group.check === 'missing-keys') {
-        out += `| Key | ${input.project.baseLocale} |\n|---|---|\n`;
-        for (const issue of group.issues) {
-            out += `| ${missingKeyLink(issue, input)} | ${cell(issue.baseValue ?? '')} |\n`;
-        }
-        out += copyPaste(group.issues, input.project);
+        head += `| Key | ${input.project.baseLocale} |\n|---|---|\n`;
+        return {
+            head,
+            rows: group.issues.map((issue) => ({
+                text: `| ${missingKeyLink(issue, input)} | ${cell(issue.baseValue ?? '')} |\n`,
+                issues: 1
+            })),
+            tail: copyPaste(group.issues, input.project)
+        };
     }
-    else {
-        for (const issue of group.issues) {
-            const where = location(issue, input);
-            const hint = issue.hint ? `. ${issue.hint}` : '';
-            out += `- ${issue.message}${hint}${where ? ` · ${where}` : ''}\n`;
-            if (issue.details?.length) {
-                const lines = issue.details.map((line) => `  - ${cell(line)}`);
-                out += `  <details><summary>${count(issue.details.length, 'key', 'keys')}</summary>\n\n${lines.join('\n')}\n\n  </details>\n`;
-            }
+    const rows = group.issues.map((issue) => {
+        const where = location(issue, input);
+        const hint = issue.hint ? `. ${issue.hint}` : '';
+        let text = `- ${issue.message}${hint}${where ? ` · ${where}` : ''}\n`;
+        if (issue.details?.length) {
+            const lines = issue.details.map((line) => `  - ${cell(line)}`);
+            text += `  <details><summary>${count(issue.details.length, 'key', 'keys')}</summary>\n\n${lines.join('\n')}\n\n  </details>\n`;
         }
-    }
-    return out;
+        return { text, issues: 1 };
+    });
+    return { head, rows, tail: '' };
 }
-// Links point to the base file
+// Links point to the base file. A row stands for its key in every locale
 function renderSharedMissingKeys(group, input, heading) {
     const { project } = input;
     const base = project.locales.get(project.baseLocale);
     const first = group.issues.filter((issue) => issue.locale === group.locale);
     const locales = group.locales.map((code) => `\`${code}\``).join(', ');
-    let out = `${heading} ❌ ${group.locales.length} locales: ${count(first.length, 'missing key', 'missing keys')}\n\n`;
-    out += `Missing in ${locales}.\n\n`;
-    out += `| Key | ${project.baseLocale} |\n|---|---|\n`;
-    for (const issue of first) {
+    let head = `${heading} ❌ ${group.locales.length} locales: ${count(first.length, 'missing key', 'missing keys')}\n\n`;
+    head += `Missing in ${locales}.\n\n`;
+    head += `| Key | ${project.baseLocale} |\n|---|---|\n`;
+    const rows = first.map((issue) => {
         const entry = base?.entries.get(issue.key);
         const url = entry ? input.link?.(entry.file, entry.line) : undefined;
         const key = showKey(issue.key);
-        out += `| ${url ? `[${key}](${url})` : key} | ${cell(issue.baseValue ?? '')} |\n`;
-    }
+        return {
+            text: `| ${url ? `[${key}](${url})` : key} | ${cell(issue.baseValue ?? '')} |\n`,
+            issues: group.locales.length
+        };
+    });
+    let tail = '';
     for (const [file, fileIssues] of byFile(first)) {
         const under = rootKey(project, group.locale, file)
             ? ', under each locale key'
             : '';
-        out += copyPasteBlock(`Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale${under})`, file, fileIssues, project, false);
+        tail += copyPasteBlock(`Copy-paste for ${withLocalePlaceholder(file, group.locale)} (the same in each locale${under})`, file, fileIssues, project, false);
     }
-    return out;
+    return { head, rows, tail };
 }
 // `locales/ar/common.json` -> `locales/{locale}/common.json`, `main-ar.json` -> `main-{locale}.json`
 function withLocalePlaceholder(path, locale) {
