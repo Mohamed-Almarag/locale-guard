@@ -416,7 +416,7 @@ describe('renderReport', () => {
     expect(body).toContain(`…and ${400 - rows.length} more issues`)
   })
 
-  it('does not point the job summary at itself when it is cut', async () => {
+  it('points to the CLI, not to itself, when the job summary is cut', async () => {
     const many = Object.fromEntries(
       Array.from({ length: 400 }, (_, i) => [`key${i}`, `Value number ${i}`])
     )
@@ -432,7 +432,7 @@ describe('renderReport', () => {
       maxLength: 5_000
     })
     expect(body).toMatch(
-      /…and \d+ more issues not shown, because this page reached its size limit\./
+      /…and \d+ more issues not shown, because this page reached its size limit\. To list every issue, run `npx locale-guard-cli --all --output report\.md` on your machine\.\n$/
     )
     expect(body).not.toContain('see the job summary')
     expect(body).toContain('📋 The copy-paste block did not fit on this page.')
