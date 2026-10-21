@@ -387,7 +387,17 @@ one that does not touch translations.
 | React with react-i18next          | [locale-guard-demo-react-i18next](https://github.com/Mohamed-Almarag/locale-guard-demo-react-i18next)                                                                 |
 | Rails with YAML files             | [locale-guard-demo-rails](https://github.com/Mohamed-Almarag/locale-guard-demo-rails)                                                                                 |
 | A base file without a locale code | [locale-guard-demo-base-file](https://github.com/Mohamed-Almarag/locale-guard-demo-base-file)                                                                         |
+| Next.js with Husky git hooks      | [locale-guard-demo-husky](https://github.com/Mohamed-Almarag/locale-guard-demo-husky)                                                                                 |
+| Nuxt with Lefthook git hooks      | [locale-guard-demo-lefthook](https://github.com/Mohamed-Almarag/locale-guard-demo-lefthook)                                                                           |
 | A weekly full report              | [locale-guard-demo-nuxt](https://github.com/Mohamed-Almarag/locale-guard-demo-nuxt/blob/main/.github/workflows/translations-weekly.yml), in `translations-weekly.yml` |
+
+Step-by-step guides in Discussions:
+
+- [Check translations on your machine with locale-guard-cli](https://github.com/Mohamed-Almarag/locale-guard/discussions/60)
+- [Check translations before each commit with Husky](https://github.com/Mohamed-Almarag/locale-guard/discussions/61)
+- [Check translations before each commit with Lefthook](https://github.com/Mohamed-Almarag/locale-guard/discussions/62)
+- [A weekly report of every translation issue](https://github.com/Mohamed-Almarag/locale-guard/discussions/63)
+- [How Locale Guard checks a pull request](https://github.com/Mohamed-Almarag/locale-guard/discussions/64)
 
 ICU messages: plurals, a `select` argument and rich text tags.
 
