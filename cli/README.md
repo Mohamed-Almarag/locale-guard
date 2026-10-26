@@ -9,6 +9,10 @@ It works with **vue-i18n** (and Nuxt), **ICU** messages (next-intl, react-intl),
 **plain JSON** (i18next, react-i18next) and **Rails** locale files, in JSON or
 YAML.
 
+Listed in the official docs of
+[i18next](https://www.i18next.com/overview/plugins-and-utils) and
+[vue-i18n](https://github.com/intlify/vue-i18n/blob/master/docs/ecosystem/tools.md#locale-guard).
+
 <img src="https://raw.githubusercontent.com/Mohamed-Almarag/locale-guard/main/docs/images/demo-cli.gif" alt="locale-guard-cli in a terminal: it lists nine issues in the changed files, saves the same report as locale-guard-report.md, and stops a commit from a Husky pre-commit hook" width="800">
 
 ```bash
@@ -409,3 +413,14 @@ CLI runs on your machine and in git hooks, before the code is pushed.
 ## License
 
 [MIT](https://github.com/Mohamed-Almarag/locale-guard/blob/main/LICENSE)
+
+---
+
+<p align="center" dir="rtl">
+  ﴿ مَا مَكَّنِّي فِيهِ رَبِّي خَيْرٌ ﴾
+</p>
+
+<p align="center">
+  <em>"What my Lord has granted me is better."</em><br>
+  <sub>Qur'an, Al-Kahf 18:95</sub>
+</p>
