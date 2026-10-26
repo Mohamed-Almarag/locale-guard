@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] - 2026-10-26
+
+### Changed
+
+- The README and the npm page say that Locale Guard is listed in the official
+  docs of i18next and vue-i18n.
+- The npm page ends with the same closing lines as the README.
+- Updated `@typescript-eslint/eslint-plugin` to 8.72.0, a development tool only.
+
 ## [1.3.0] - 2026-10-21
 
 ### Added
@@ -167,6 +176,7 @@ First release.
 - `fail-on`, `fail-on-existing`, `ignore-keys`, `ignore-locales`,
   `ignore-values` and `disable-checks`.
 
+[1.3.1]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.3.1
 [1.3.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.1.0

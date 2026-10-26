@@ -14,6 +14,10 @@ It works with **vue-i18n** (and Nuxt), **ICU** messages (next-intl, react-intl),
 **plain JSON** (i18next, react-i18next) and **Rails** locale files, in JSON or
 YAML.
 
+Listed in the official docs of
+[i18next](https://www.i18next.com/overview/plugins-and-utils) and
+[vue-i18n](https://github.com/intlify/vue-i18n/blob/master/docs/ecosystem/tools.md#locale-guard).
+
 <img src="docs/images/demo-action.gif" alt="Locale Guard on a Nuxt pull request: the comment with six errors and three warnings, then an annotation on the Arabic file" width="800">
 
 <img src="docs/images/demo-cli.gif" alt="locale-guard-cli in a terminal: it lists nine issues in the changed files, saves the same report as locale-guard-report.md, and stops a commit from a Husky pre-commit hook" width="800">
