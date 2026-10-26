@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.2] - 2026-10-26
+
+### Security
+
+- Updated `undici`, the HTTP client the Action uses to call the GitHub API, to
+  6.29.1 for its security fixes. The checks and their results are the same as in
+  1.3.1.
+
+### Changed
+
+- The Action bundles one copy of `undici` instead of two, so `dist/index.js` is
+  about 30% smaller.
+- Updated the build to rollup 4.65.0 and `@rollup/plugin-typescript` 12.3.1.
+
 ## [1.3.1] - 2026-10-26
 
 ### Changed
@@ -176,6 +190,7 @@ First release.
 - `fail-on`, `fail-on-existing`, `ignore-keys`, `ignore-locales`,
   `ignore-values` and `disable-checks`.
 
+[1.3.2]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.3.2
 [1.3.1]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.3.1
 [1.3.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Mohamed-Almarag/locale-guard/releases/tag/v1.2.0
